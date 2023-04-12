@@ -3,8 +3,6 @@
 #include "stdafx.h"
 #include "DataBase.h"
 
-
-
 HANDLE g_h_iocp;
 SOCKET g_s_socket;
 mutex LuaLock;
@@ -292,7 +290,7 @@ void process_packet(int client_id, unsigned char* p)
     case CS_PACKET_LOGIN: {
         cs_packet_login* packet = reinterpret_cast<cs_packet_login*>(p);
         strcpy_s(cl.name, packet->name);
-        if (LoadDB(cl.name)) {
+        if (Load_DB(cl.name)) {
             cl.x = p_x;
             cl.y = p_y;
             cl.level = p_lv;

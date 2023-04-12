@@ -1,3 +1,4 @@
+#pragma once
 #include "Server.h"
 
 void error_display(int err_no)

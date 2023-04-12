@@ -1,3 +1,4 @@
+#pragma once
 #include "DataBase.h"
 
 void show_error() {
@@ -155,7 +156,7 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
 }
 
 
-BOOL LoadDB(char* t)
+bool Load_DB(char* t)
 {
     
     SQLRETURN retcode;
@@ -216,12 +217,8 @@ void UpdatePlayerOnDB(int c_id, CLIENT& client)
     //CLIENT& CL = clients[c_id];
     std::string t = CL.name;
     //string x = to_string(CL.x);
-
-    SQLHENV henv;
-    SQLHDBC hdbc;
-    SQLHSTMT hstmt = 0;
+    
     SQLRETURN retcode;
-    SQLINTEGER p_id;
 
     SQLSMALLINT p_level;
     //string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + to_string(CL.x) + ", @Param2 = " + to_string(CL.y);
