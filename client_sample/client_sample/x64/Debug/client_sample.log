@@ -1,0 +1,17 @@
+﻿  2021g_Client.cpp
+E:\대학교\3-2\게임서버\2021_게임서버_기말텀프\client_sample\client_sample\2021g_Client.cpp(107,50): warning C4244: '인수': 'int'에서 'T'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+          with
+          [
+              T=float
+          ]
+E:\대학교\3-2\게임서버\2021_게임서버_기말텀프\client_sample\client_sample\2021g_Client.cpp(396,62): warning C4244: '인수': 'int'에서 'T'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+          with
+          [
+              T=float
+          ]
+E:\대학교\3-2\게임서버\2021_게임서버_기말텀프\client_sample\client_sample\2021g_Client.cpp(400,44): warning C4244: '인수': 'int'에서 'T'(으)로 변환하면서 데이터가 손실될 수 있습니다.
+          with
+          [
+              T=float
+          ]
+  client_sample.vcxproj -> E:\대학교\3-2\게임서버\2021_게임서버_기말텀프\client_sample\x64\Debug\client_sample.exe

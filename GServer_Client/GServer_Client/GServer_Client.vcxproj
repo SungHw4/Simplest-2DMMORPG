@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>16.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{cde0a4ad-8a15-4f26-b8de-67ee6dd5bc21}</ProjectGuid>
+    <RootNamespace>GServerClient</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <IncludePath>$(VC_IncludePath);$(WindowsSDK_IncludePath);include\;$(IncludePath)</IncludePath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <LanguageStandard>Default</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="2021g_Client.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="SFML\Config.hpp" />
+    <ClInclude Include="SFML\Graphics.hpp" />
+    <ClInclude Include="SFML\Graphics\BlendMode.hpp" />
+    <ClInclude Include="SFML\Graphics\CircleShape.hpp" />
+    <ClInclude Include="SFML\Graphics\Color.hpp" />
+    <ClInclude Include="SFML\Graphics\ConvexShape.hpp" />
+    <ClInclude Include="SFML\Graphics\Drawable.hpp" />
+    <ClInclude Include="SFML\Graphics\Export.hpp" />
+    <ClInclude Include="SFML\Graphics\Font.hpp" />
+    <ClInclude Include="SFML\Graphics\Glsl.hpp" />
+    <ClInclude Include="SFML\Graphics\Glyph.hpp" />
+    <ClInclude Include="SFML\Graphics\Image.hpp" />
+    <ClInclude Include="SFML\Graphics\PrimitiveType.hpp" />
+    <ClInclude Include="SFML\Graphics\Rect.hpp" />
+    <ClInclude Include="SFML\Graphics\RectangleShape.hpp" />
+    <ClInclude Include="SFML\Graphics\RenderStates.hpp" />
+    <ClInclude Include="SFML\Graphics\RenderTarget.hpp" />
+    <ClInclude Include="SFML\Graphics\RenderTexture.hpp" />
+    <ClInclude Include="SFML\Graphics\RenderWindow.hpp" />
+    <ClInclude Include="SFML\Graphics\Shader.hpp" />
+    <ClInclude Include="SFML\Graphics\Shape.hpp" />
+    <ClInclude Include="SFML\Graphics\Sprite.hpp" />
+    <ClInclude Include="SFML\Graphics\Text.hpp" />
+    <ClInclude Include="SFML\Graphics\Texture.hpp" />
+    <ClInclude Include="SFML\Graphics\Transform.hpp" />
+    <ClInclude Include="SFML\Graphics\Transformable.hpp" />
+    <ClInclude Include="SFML\Graphics\Vertex.hpp" />
+    <ClInclude Include="SFML\Graphics\VertexArray.hpp" />
+    <ClInclude Include="SFML\Graphics\VertexBuffer.hpp" />
+    <ClInclude Include="SFML\Graphics\View.hpp" />
+    <ClInclude Include="SFML\Network.hpp" />
+    <ClInclude Include="SFML\Network\Export.hpp" />
+    <ClInclude Include="SFML\Network\Ftp.hpp" />
+    <ClInclude Include="SFML\Network\Http.hpp" />
+    <ClInclude Include="SFML\Network\IpAddress.hpp" />
+    <ClInclude Include="SFML\Network\Packet.hpp" />
+    <ClInclude Include="SFML\Network\Socket.hpp" />
+    <ClInclude Include="SFML\Network\SocketHandle.hpp" />
+    <ClInclude Include="SFML\Network\SocketSelector.hpp" />
+    <ClInclude Include="SFML\Network\TcpListener.hpp" />
+    <ClInclude Include="SFML\Network\TcpSocket.hpp" />
+    <ClInclude Include="SFML\Network\UdpSocket.hpp" />
+    <ClInclude Include="SFML\System.hpp" />
+    <ClInclude Include="SFML\System\Clock.hpp" />
+    <ClInclude Include="SFML\System\Err.hpp" />
+    <ClInclude Include="SFML\System\Export.hpp" />
+    <ClInclude Include="SFML\System\FileInputStream.hpp" />
+    <ClInclude Include="SFML\System\InputStream.hpp" />
+    <ClInclude Include="SFML\System\Lock.hpp" />
+    <ClInclude Include="SFML\System\MemoryInputStream.hpp" />
+    <ClInclude Include="SFML\System\Mutex.hpp" />
+    <ClInclude Include="SFML\System\NativeActivity.hpp" />
+    <ClInclude Include="SFML\System\NonCopyable.hpp" />
+    <ClInclude Include="SFML\System\Sleep.hpp" />
+    <ClInclude Include="SFML\System\String.hpp" />
+    <ClInclude Include="SFML\System\Thread.hpp" />
+    <ClInclude Include="SFML\System\ThreadLocal.hpp" />
+    <ClInclude Include="SFML\System\ThreadLocalPtr.hpp" />
+    <ClInclude Include="SFML\System\Time.hpp" />
+    <ClInclude Include="SFML\System\Utf.hpp" />
+    <ClInclude Include="SFML\System\Vector2.hpp" />
+    <ClInclude Include="SFML\System\Vector3.hpp" />
+    <ClInclude Include="SFML\Window.hpp" />
+    <ClInclude Include="SFML\Window\Clipboard.hpp" />
+    <ClInclude Include="SFML\Window\Context.hpp" />
+    <ClInclude Include="SFML\Window\ContextSettings.hpp" />
+    <ClInclude Include="SFML\Window\Cursor.hpp" />
+    <ClInclude Include="SFML\Window\Event.hpp" />
+    <ClInclude Include="SFML\Window\Export.hpp" />
+    <ClInclude Include="SFML\Window\GlResource.hpp" />
+    <ClInclude Include="SFML\Window\Joystick.hpp" />
+    <ClInclude Include="SFML\Window\Keyboard.hpp" />
+    <ClInclude Include="SFML\Window\Mouse.hpp" />
+    <ClInclude Include="SFML\Window\Sensor.hpp" />
+    <ClInclude Include="SFML\Window\Touch.hpp" />
+    <ClInclude Include="SFML\Window\VideoMode.hpp" />
+    <ClInclude Include="SFML\Window\Window.hpp" />
+    <ClInclude Include="SFML\Window\WindowHandle.hpp" />
+    <ClInclude Include="SFML\Window\WindowStyle.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\lib\sfml-graphics-s-d.pdb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="..\lib\sfml-network-s-d.pdb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="..\lib\sfml-system-s-d.pdb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="..\lib\sfml-window-s-d.pdb">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </None>
+    <None Include="SFML\Graphics\Glsl.inl" />
+    <None Include="SFML\Graphics\Rect.inl" />
+    <None Include="SFML\System\String.inl" />
+    <None Include="SFML\System\Thread.inl" />
+    <None Include="SFML\System\ThreadLocalPtr.inl" />
+    <None Include="SFML\System\Utf.inl" />
+    <None Include="SFML\System\Vector2.inl" />
+    <None Include="SFML\System\Vector3.inl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\lib\freetype.lib" />
+    <Library Include="..\lib\sfml-graphics-s-d.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-graphics-s.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-network-s-d.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-network-s.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-system-s-d.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-system-s.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-window-s-d.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+    <Library Include="..\lib\sfml-window-s.lib">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </Library>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
