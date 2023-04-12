@@ -15,6 +15,11 @@
 *.o
 *.obj
 *.vs
+*.pdb
+*.idb
+*.lastbuildstate
+
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -38,5 +43,7 @@
 *.exe
 *.out
 *.app
+
+
 
 # End of https://www.toptal.com/developers/gitignore/api/c++
