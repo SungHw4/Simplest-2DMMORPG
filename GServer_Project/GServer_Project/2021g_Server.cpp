@@ -12,7 +12,13 @@ BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 //BOOL LoadDB(string t);
 //void UpdatePlayerOnDB(int c_id);
 
-
+extern SQLINTEGER p_id;
+extern SQLINTEGER p_x;
+extern SQLINTEGER p_y;
+extern SQLINTEGER p_hp;
+extern SQLINTEGER p_maxhp;
+extern SQLINTEGER p_exp;
+extern SQLINTEGER p_lv;
 
 concurrency::concurrent_priority_queue <timer_event> timer_queue;
 
@@ -1096,6 +1102,7 @@ void do_timer() {
 int main()
 {
     //LoadDB("Youngin");
+    Initialize_DB();
     Initialize_NPC();
     Initialize_obstacle();
     cout << "NPC initialize fin" << endl;

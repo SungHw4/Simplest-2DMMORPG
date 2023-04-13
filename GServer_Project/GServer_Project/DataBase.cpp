@@ -1,6 +1,18 @@
 #pragma once
 #include "DataBase.h"
 
+SQLHENV henv;
+SQLHDBC hdbc;
+SQLHSTMT hstmt = 0;
+
+extern SQLINTEGER p_id{};
+extern SQLINTEGER p_x{};
+extern SQLINTEGER p_y{};
+extern SQLINTEGER p_hp{};
+extern SQLINTEGER p_maxhp{};
+extern SQLINTEGER p_exp{};
+extern SQLINTEGER p_lv{};
+
 void show_error() {
     printf("error\n");
 }
@@ -50,7 +62,7 @@ void Initialize_DB()
                 if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
                     //    cout << "ODBC Connected," << endl;
                     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-                    
+                    cout << "DB connect SUCCESS" << endl;
                 }
                 else {
                     
@@ -60,13 +72,13 @@ void Initialize_DB()
     }
 }
 
-bool Add_DB(char* ID, char* pwd)
+bool Add_DB(char* ID, char* pwd, char* nickname)
 {
-    if (DB_Injection(ID) && DB_Injection(pwd))
+    if (DB_Injection(ID) && DB_Injection(pwd) && DB_Injection(nickname))
     {
         SQLRETURN retcode;
         char tmp[100];
-        sprintf_s(tmp, sizeof(tmp), "EXEC ADDPlayer %s, %s", ID, pwd);
+        sprintf_s(tmp, sizeof(tmp), "EXEC ADDPlayer %s, %s %s", ID, pwd, nickname);
 
         wchar_t* exec;
         int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
