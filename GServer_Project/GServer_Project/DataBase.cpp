@@ -39,6 +39,7 @@ void HandleDiagnosticRecord(SQLHANDLE hHandle, SQLSMALLINT hType, RETCODE RetCod
 void Initialize_DB()
 {
     SQLRETURN retcode;
+    setlocale(LC_ALL, "korean");
 
     // Allocate environment handle  
     retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
@@ -160,11 +161,7 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
                     break;
             }
         }
-
-
     }
-
-
 }
 
 
@@ -234,51 +231,18 @@ void UpdatePlayerOnDB(int c_id, CLIENT& client)
 
     SQLSMALLINT p_level;
     //string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + to_string(CL.x) + ", @Param2 = " + to_string(CL.y);
-    string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + std::to_string(CL.x) + ", @Param2 = " + to_string(CL.y) + ", @Param3 = " + to_string(CL.hp) + ", @Param4 = " + to_string(CL.maxhp) + ", @Param5 = " + to_string(CL.exp) + ", @Param6 = " + to_string(CL.level);
-    cout << temp << endl;
-    wstring tmp;
-    tmp.assign(temp.begin(), temp.end());
-    
+    //string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + std::to_string(CL.x) + ", @Param2 = " + to_string(CL.y) + ", @Param3 = " + to_string(CL.hp) + ", @Param4 = " + to_string(CL.maxhp) + ", @Param5 = " + to_string(CL.exp) + ", @Param6 = " + to_string(CL.level);
+    //cout << temp << endl;
+    //wstring tmp;
+    //tmp.assign(temp.begin(), temp.end());
+    char tmp[100];
+    sprintf_s(tmp, sizeof(tmp), "EXEC UpdatePlayer %s, %s, %s, %s, %s, %s", CL.name, CL.level, CL.x, CL.y, CL.hp, CL.exp);
 
-    setlocale(LC_ALL, "korean");
+    wchar_t* exec;
+    int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
+    exec = new WCHAR[strSize];
+    MultiByteToWideChar(CP_ACP, 0, tmp, sizeof(tmp) + 1, exec, strSize);
 
-    // Allocate environment handle
-    retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
-
-    // Set the ODBC version environment attribute
-    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-        retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);
-
-        // Allocate connection handle
-        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-            retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
-
-            // Set login timeout to 5 seconds
-            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-                SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-
-                // Connect to data source
-                retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2021_GServer_ODBC", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
-
-                // Allocate statement handle
-                if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-               //     cout << "ODBC Connected," << endl;
-
-
-                    // Process data
-                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-                        SQLCancel(hstmt);
-                        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-                    }
-
-                    SQLDisconnect(hdbc);
-                }
-
-                SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
-            }
-        }
-        SQLFreeHandle(SQL_HANDLE_ENV, henv);
-    }
 }
 
 
@@ -290,13 +254,12 @@ bool DB_Injection(std::string word)
     {
         if (!(allowableCharacters.find(ch) != std::string::npos))
         {
+            cout << "can't using word" << endl;
             return false;
         }
         
     }
     return true;
-   
-
 }
 
 void Disconnect_DB()
