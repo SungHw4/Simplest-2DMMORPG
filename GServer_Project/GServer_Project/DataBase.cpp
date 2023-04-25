@@ -165,17 +165,16 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
 }
 
 
-bool Load_DB(char* t)
+bool Load_DB(char* ID, char* PW)
 {
     
     SQLRETURN retcode;
     char tmp[100];
-    SQLSMALLINT p_level;
     SQLWCHAR p_Name[NAME_LEN];
-    SQLLEN cbName = 0, cbP_ID = 0, cbP_Level = 0, cbP_X = 0, cbP_Y = 0;
+    SQLLEN cbName = 0, cbP_X = 0, cbP_Y = 0;
     SQLLEN cbP_HP = 0, cbP_MAXHP = 0, cbP_EXP = 0, cbP_LV = 0;
 
-    sprintf_s(tmp, sizeof(tmp), "EXEC LoadPlayerID %s", t );
+    sprintf_s(tmp, sizeof(tmp), "EXEC LoadPlayerID %s %s", ID, PW );
 
     wchar_t* exec;
     int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
@@ -185,10 +184,8 @@ bool Load_DB(char* t)
     retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
     retcode = SQLExecDirect(hstmt, (SQLWCHAR*)exec, SQL_NTS);
 
-   if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-
-       // Bind columns 1, 2, and 3  
-       //retcode = SQLBindCol(hstmt, 1, SQL_C_LONG, &p_id, 100, &cbP_ID);
+   if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) 
+   {
        retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, p_Name, NAME_LEN, &cbName);
        retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &p_x, 10, &cbP_X);
        retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &p_y, 10, &cbP_Y);
@@ -197,18 +194,12 @@ bool Load_DB(char* t)
        retcode = SQLBindCol(hstmt, 6, SQL_C_LONG, &p_maxhp, 10, &cbP_MAXHP);
        retcode = SQLBindCol(hstmt, 7, SQL_C_LONG, &p_exp, 10, &cbP_EXP);
 
-       // Fetch and print each row of data. On an error, display a message and exit.  
        for (int i = 0; ; i++) {
            retcode = SQLFetch(hstmt);
            if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) show_error();
            else HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
            {
-               //replace wprintf with printf
-               //%S with %ls
-               //warning C4477: 'wprintf' : format string '%S' requires an argument of type 'char *'
-               //but variadic argument 2 has type 'SQLWCHAR *'
-               //wprintf(L"%d: %S %S %S\n", i + 1, sCustID, szName, szPhone);  
                wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
            }
            else
@@ -244,7 +235,6 @@ void UpdatePlayerOnDB(int c_id, CLIENT& client)
     MultiByteToWideChar(CP_ACP, 0, tmp, sizeof(tmp) + 1, exec, strSize);
 
 }
-
 
 bool DB_Injection(std::string word)
 {
