@@ -24,79 +24,12 @@ concurrency::concurrent_priority_queue <timer_event> timer_queue;
 
 //void error_display(int err_no);
 //void do_npc_move(int npc_id);
-void do_npc_move(int npc_id, std::chrono::seconds time = 1s);
+void do_npc_move(int npc_id, int target ,std::chrono::seconds time = 1s);
 void npcmove(int npc_id);
 
 
 
-//class CLIENT {
-//public:
-//    char name[MAX_NAME_SIZE];
-//    int      _id;
-//    short  x, y;
-//    short	level;
-//    short	hp, maxhp;
-//    short	exp;
-//    short   dmg;
-//    unordered_set   <int>  viewlist;
-//    mutex vl;
-//    lua_State* L;
-//
-//    mutex Lua_Lock;
-//    mutex state_lock;
-//    STATE _state;
-//    atomic_bool   _is_active;
-//    int      _type;   // 1.Player   2.NPC(dog) 3. NPC(cat)   
-//
-//    EXP_OVER _recv_over;
-//    SOCKET  _socket;
-//    int      _prev_size;
-//    int      last_move_time;
-//public:
-//    CLIENT() : _state(ST_FREE), _prev_size(0)
-//    {
-//        x = 0;
-//        y = 0;
-//    }
-//
-//    ~CLIENT()
-//    {
-//        closesocket(_socket);
-//    }
-//
-//    void do_recv()
-//    {
-//        DWORD recv_flag = 0;
-//        ZeroMemory(&_recv_over._wsa_over, sizeof(_recv_over._wsa_over));
-//        _recv_over._wsa_buf.buf = reinterpret_cast<char*>(_recv_over._net_buf + _prev_size);
-//        _recv_over._wsa_buf.len = sizeof(_recv_over._net_buf) - _prev_size;
-//        int ret = WSARecv(_socket, &_recv_over._wsa_buf, 1, 0, &recv_flag, &_recv_over._wsa_over, NULL);
-//        if (SOCKET_ERROR == ret) {
-//            int error_num = WSAGetLastError();
-//            if (ERROR_IO_PENDING != error_num)
-//                error_display(error_num);
-//        }
-//    }
-//
-//    void do_send(int num_bytes, void* mess)
-//    {
-//        EXP_OVER* ex_over = new EXP_OVER(OP_SEND, num_bytes, mess);
-//        int ret = WSASend(_socket, &ex_over->_wsa_buf, 1, 0, 0, &ex_over->_wsa_over, NULL);
-//        if (SOCKET_ERROR == ret) {
-//            int error_num = WSAGetLastError();
-//            if (ERROR_IO_PENDING != error_num)
-//                error_display(error_num);
-//        }
-//    }
-//};
-
 array <CLIENT, MAX_USER + MAX_NPC> clients;
-//array <CLIENT, 125'000'00> obstacle;
-// ID ¿¡ ¿µ¿ªÁöÁ¤
-// 0 - (MAX_USER - 1) : ÇÃ·¹ÀÌ¾î
-// MAX_USER  - (MAX_USER + MAX_NPC) : NPC
-
-
 
 
 bool is_near(int a, int b)
@@ -286,7 +219,13 @@ void Activate_Player_Move_Event(int target, int player_id)
     exp_over->_target = player_id;
     PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
 }
-
+void Activate_NPC_Move_Event(int target, int player_id)
+{
+    EXP_OVER* exp_over = new EXP_OVER;
+    exp_over->_comp_op = OP_NPC_MOVE;
+    exp_over->_target = player_id;
+    PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
+}
 void process_packet(int client_id, unsigned char* p)
 {
     unsigned char packet_type = p[1];
@@ -315,7 +254,7 @@ void process_packet(int client_id, unsigned char* p)
         cl._state = ST_INGAME;
         cl.state_lock.unlock();
 
-        // »õ·Î Á¢¼ÓÇÑ ÇÃ·¹ÀÌ¾îÀÇ Á¤º¸¸¦ ÁÖÀ§ ÇÃ·¹ÀÌ¾î¿¡°Ô º¸³½´Ù
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
         for (auto& other : clients) {
             if (other._id == client_id) continue;
 
@@ -354,7 +293,7 @@ void process_packet(int client_id, unsigned char* p)
             other.do_send(sizeof(packet), &packet);
         }
 
-        // »õ·Î Á¢¼ÓÇÑ ÇÃ·¹ÀÌ¾î¿¡°Ô ÁÖÀ§ °´Ã¼ Á¤º¸¸¦ º¸³½´Ù
+        // ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½Ã·ï¿½ï¿½Ì¾î¿¡ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½Ã¼ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½
 
         for (auto& other : clients) {
             if (other._id == client_id) continue;
@@ -387,43 +326,14 @@ void process_packet(int client_id, unsigned char* p)
     }
     case CS_PACKET_ATTACK: {
         cout << "1" << endl;
-        //unordered_set <int> nearlist;
-        //for (auto& other : clients) {
-        //    if (other._id == client_id)
-        //        continue;
-        //    if (ST_INGAME != other._state)
-        //        continue;
-        //    if (false == is_attack_range(client_id, other._id))
-        //        continue;
-        //    if (true == is_npc(other._id)) {
-        //    }
-        //    //nearlist.insert(other._id);
-        //    clients[client_id].viewlist.insert(other._id);
-        //}
         cl.vl.lock();
         unordered_set <int> my_vl{ cl.viewlist };
         cl.vl.unlock();
         for (auto& k : my_vl)
             cout << k << endl;
-        //for (auto other : nearlist) {
-        //    if (0 == my_vl.count(other)) {}
-        //    
-        //    else {
-        //        if (true == is_npc(other)) break;
-
-        //        clients[other].vl.lock();
-        //        if (0 != clients[other].viewlist.count(cl._id)) {
-        //            clients[other].vl.unlock();
-        //        }
-        //        else {
-        //            clients[other].viewlist.insert(cl._id);
-        //            clients[other].vl.unlock();
-        //        }
-        //    }
-        //}
         
         for (auto& k : my_vl) {
-            cout << endl<< k << endl << endl;
+            //cout << endl<< k << endl << endl;
             if (is_attack_range(client_id, k))
             {
                 cout << "123" << endl;
@@ -471,18 +381,29 @@ void process_packet(int client_id, unsigned char* p)
         cl.y = y;
 
         unordered_set <int> nearlist;
-        for (auto& other : clients) {
-            if (other._id == client_id)
-                continue;
-            if (ST_INGAME != other._state)
-                continue;
-            if (false == is_near(client_id, other._id))
-                continue;
-            if (true == is_npc(other._id)) {
-                //Activate_Player_Move_Event(other._id, cl._id);
+            for (auto& other : clients) {
+                if (other._id == client_id)
+                    continue;
+                if (ST_INGAME != other.get_state())
+                    continue;
+                if (false == is_near(client_id, other.get_id()))
+                    continue;
+                if (true == is_npc(other.get_id())) {
+                    //Activate_Player_Move_Event(other._id, cl._id);
+                    if(other._is_active == false)
+                    {
+                        other.set_active(true);
+                        timer_event ev;
+                        ev.obj_id = other.get_id();
+                        ev.start_time = chrono::system_clock::now() + 1s;
+                        //ev.ev = EVENT_NPC_ATTACK;
+                        ev.target_id = client_id;
+                        timer_queue.push(ev);
+                        Activate_Player_Move_Event(other.get_id(), cl.get_id());
+                    }
+                }
+                nearlist.insert(other.get_id());
             }
-            nearlist.insert(other._id);
-        }
 
         send_move_packet(cl._id, cl._id);
 
@@ -490,7 +411,7 @@ void process_packet(int client_id, unsigned char* p)
         unordered_set <int> my_vl{ cl.viewlist };
         cl.vl.unlock();
 
-        // »õ·Î½Ã¾ß¿¡ µé¾î¿Â ÇÃ·¹ÀÌ¾î Ã³¸®
+        //ìƒˆë¡œ ì‹œì•¼ì— ë“¤ì–´ì˜¨ í”Œë ˆì´ì–´ ì²˜ë¦¬
         for (auto other : nearlist) {
             if (0 == my_vl.count(other)) {
                 cl.vl.lock();
@@ -507,6 +428,7 @@ void process_packet(int client_id, unsigned char* p)
                     timer_queue.push(ev);
                     continue;
                 }
+                //if( true == is_npc(other)) break;
 
                 clients[other].vl.lock();
                 if (0 == clients[other].viewlist.count(cl._id)) {
@@ -519,9 +441,9 @@ void process_packet(int client_id, unsigned char* p)
                     send_move_packet(other, cl._id);
                 }
             }
-            // °è¼Ó ½Ã¾ß¿¡ Á¸ÀçÇÏ´Â ÇÃ·¹ÀÌ¾î Ã³¸®
+            // ê³„ì† ì‹œì•¼ì— ë“¤ì–´ì˜¨ í”Œë ˆì´ì–´ ì²˜ë¦¬
             else {
-                if (true == is_npc(other)) break;
+                if (true == is_npc(other)) break; //ì›ë˜ìˆë˜ê±°ëŠ” ì–´ì°¨í”¼ npc_moveì—ì„œ ì²˜ë¦¬í•¨
 
                 clients[other].vl.lock();
                 if (0 != clients[other].viewlist.count(cl._id)) {
@@ -535,7 +457,7 @@ void process_packet(int client_id, unsigned char* p)
                 }
             }
         }
-        // ½Ã¾ß¿¡¼­ »ç¶óÁø ÇÃ·¹ÀÌ¾î Ã³¸®
+        // ì‹œì•¼ì—ì„œ ì‚¬ë¼ì§„ í”Œë ˆì´ì–´ ì²˜ë¦¬
         for (auto other : my_vl) {
             if (0 == nearlist.count(other)) {
                 cl.vl.lock();
@@ -643,22 +565,32 @@ void worker()
         }
                       break;
         case OP_NPC_MOVE: {
-            delete exp_over;
-           unordered_set<int> old_viewlist;
-           for (auto& obj : clients) {
-              if (obj._state != ST_INGAME) continue;
-              // if (true == is_npc(obj._id)) continue;   // npc°¡ ¾Æ´Ò¶§
-              if (true == is_npc(obj._id)) break;   // npc°¡ ¾Æ´Ò¶§
-              if (true == is_near(client_id, obj._id)) {      // ±ÙÃ³¿¡ ÀÖÀ»¶§
-                 old_viewlist.insert(obj._id);         // npc±ÙÃ³¿¡ ÇÃ·¹ÀÌ¾î°¡ ÀÖÀ¸¸é old_viewlist¿¡ ÇÃ·¹ÀÌ¾î id¸¦ ³Ö´Â´Ù
-              }
-           }
-           for (auto pl : old_viewlist) {
-              send_move_packet(pl, client_id);
-           }
-           cout << "¿òÁ÷¿©" << endl;
-            do_npc_move(client_id);
-            break;
+                clients[client_id].state_lock.lock();
+                if(clients[client_id].get_state() != ST_INGAME)
+                {
+                    clients[client_id].state_lock.unlock();
+                    clients[client_id].set_active(false);
+                    delete exp_over;
+                    break;
+                }
+                clients[client_id].state_lock.unlock();
+                if(exp_over->_target == -1)
+                {
+                    delete exp_over;
+                    break;
+                }
+
+                clients[client_id].Lua_Lock.lock();
+                lua_State* L = clients[client_id].L;
+                lua_getglobal(L,"event_NPC_move");
+                int err = lua_pcall(L,1,1,0);
+                if(err != 0) cout << "event_NPC_move ERR" << endl;
+                bool m = lua_toboolean(L,-1);
+                lua_pop(L,2);
+                clients[client_id].Lua_Lock.unlock();
+                if(m) do_npc_move(client_id,exp_over->_target);
+                delete exp_over;
+                break;
         }
         case OP_PLAYER_MOVE: {
             //clients[client_id].Lua_Lock.lock();
@@ -754,11 +686,13 @@ void Initialize_NPC()
             lua_pcall(L, 0, 0, 0);
         lua_getglobal(L, "set_uid");
         lua_pushnumber(L, i);
-        lua_pcall(L, 1, 1, 0);
-        lua_pop(L, 1);// eliminate set_uid from stack after call
+        lua_pushnumber(L,clients[i].x);
+        lua_pushnumber(L,clients[i].y);
+        lua_pcall(L, 3, 3, 0);
+        lua_pop(L, 4);// eliminate set_uid from stack after call
 
-        lua_register(L, "API_SendMessage", API_SendMessage);
-        lua_register(L, "API_Touch_Massage", API_Touch_Message);
+        //lua_register(L, "API_SendMessage", API_SendMessage);
+        //lua_register(L, "API_Touch_Massage", API_Touch_Message);
         lua_register(L, "API_get_x", API_get_x);
         lua_register(L, "API_get_y", API_get_y);
     }
@@ -802,21 +736,65 @@ void npcmove(int npc_id)
     ev.ev = EVENT_NPC_MOVE;
     timer_queue.push(ev);
 }
-void do_npc_move(int npc_id, std::chrono::seconds time)
+void do_npc_move(int npc_id, int target, std::chrono::seconds time)
 {
+    //int target;
     unordered_set <int> old_viewlist;
     unordered_set <int> new_viewlist;
 
     for (auto& obj : clients) {
         if (obj._state != ST_INGAME)
             continue;
-        if (false == is_player(obj._id))
+        if (false == is_player(obj.get_id()))
             continue;
-        if (true == is_near(npc_id, obj._id))
+        if (true == is_near(npc_id, obj.get_id()))
             old_viewlist.insert(obj._id);
     }
     auto& x = clients[npc_id].x;
     auto& y = clients[npc_id].y;
+    auto& t_x = clients[target].x;
+    auto& t_y = clients[target].y;
+    
+    if (t_x != x) {
+        if (t_x > x) x++;
+        else x--;
+    }
+    else if(t_y != y){
+        if (t_y > y) y++;
+        else y--;
+    }
+    clients[npc_id].x = x;
+    clients[npc_id].y = y;
+
+    for(auto& obj : clients)
+    {
+        if(obj.get_state() != ST_INGAME) continue;
+        if (true == is_npc(obj.get_id())) break;
+        if(true == is_near(npc_id ,obj.get_id()))
+        {
+            new_viewlist.insert(obj.get_id());
+        }
+    }
+    int temp = 0;
+
+    for(auto p1 : new_viewlist)
+    {
+        if( 0 == old_viewlist.count(p1))
+        {
+            clients[p1].vl.lock();
+            clients[p1].viewlist.insert(npc_id);
+            clients[p1].vl.unlock();
+            send_put_object(p1,npc_id);
+            //reinterpret_cast<CLIENT*>(clients[p1])->vl.lock();
+            //reinterpret_cast<CLIENT*>(clients[p1])->viewlist.insert(npc_id);
+            //reinterpret_cast<CLIENT*>(clients[p1])->vl.unlock();
+            //send_put_object(reinterpret_cast<CLIENT*>(clients[p1]), clients[npc_id]);
+        } else
+        {
+            send_move_packet(p1,npc_id);
+        }
+    }
+    
    /* clients[npc_id].Lua_Lock.lock();
     lua_State* L = clients[npc_id].L;
     
@@ -831,23 +809,16 @@ void do_npc_move(int npc_id, std::chrono::seconds time)
     y = lua_tonumber(L, -1);
     clients[npc_id].Lua_Lock.unlock();*/
 
-    //cout << x <<" " << y << endl;
-    
-    switch (rand() % 4) {
-    case 0: if (y > 0 && (obs[y - 1][x] == 0)) y--; break;
-    case 1: if (y < (WORLD_HEIGHT - 1) && (obs[y + 1][x] == 0)) y++; break;
-    case 2: if (x > 0 && (obs[y][x - 1] == 0)) x--; break;
-    case 3: if (x < (WORLD_WIDTH - 1) && (obs[y][x + 1] == 0)) x++; break;
-    }
+   
     for (auto& obj : clients) {
         if (obj._state != ST_INGAME)
             continue;
-        if (false == is_player(obj._id))
+        if (false == is_player(obj.get_id()))
             continue;
-        if (true == is_near(npc_id, obj._id))
-            new_viewlist.insert(obj._id);
+        if (true == is_near(npc_id, obj.get_id()))
+            new_viewlist.insert(obj.get_id());
     }
-    // »õ·Î ½Ã¾ß¿¡ µé¾î¿Â ÇÃ·¹ÀÌ¾î
+    // ìƒˆë¡œ ì‹œì•¼ì— ë“¤ì–´ì˜¨ í”Œë ˆì´ì–´
     int temp_client_id = 0;
     for (auto pl : new_viewlist) {
         if (0 == old_viewlist.count(pl)) {
@@ -861,7 +832,7 @@ void do_npc_move(int npc_id, std::chrono::seconds time)
         }
         temp_client_id = pl;
     }
-    // ½Ã¾ß¿¡¼­ »ç¶óÁö´Â °æ¿ì
+    // ì‹œì•¼ì—ì„œ ì‚¬ë¼ì§€ëŠ” ê²½ìš°
     for (auto pl : old_viewlist) {
         if (0 == new_viewlist.count(pl)) {
             clients[pl].vl.lock();
@@ -870,14 +841,22 @@ void do_npc_move(int npc_id, std::chrono::seconds time)
             send_remove_object(pl, npc_id);
         }
     }
+    clients[npc_id].state_lock.lock();
+    if(clients[npc_id].get_state() != ST_INGAME)
+    {
+        clients[npc_id].state_lock.unlock();
+        return;
+    }
+    clients[npc_id].state_lock.unlock();
+    
     timer_event ev;
     ev.obj_id = npc_id;
-    ev.target_id = temp_client_id;
+    //ev.target_id = temp_client_id;
+    ev.target_id = target;
     ev.start_time = chrono::system_clock::now() + time;
     ev.ev = EVENT_NPC_MOVE;
     timer_queue.push(ev);
 }
-
 void do_timer() {
 
     chrono::system_clock::duration dura;
@@ -889,19 +868,19 @@ void do_timer() {
             temp_bool = false;
             EXP_OVER* ex_over = new EXP_OVER;
             ex_over->_comp_op = OP_NPC_MOVE;
-            PostQueuedCompletionStatus(g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);   //0Àº ¼ÒÄÏÃë±ŞÀ» ¹ŞÀ½
+            PostQueuedCompletionStatus(g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);   //0ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
         }
 
         while (true) {
             timer_event ev;
-            if (timer_queue.size() == 0) continue;
+            if (timer_queue.size() == 0) break;
             timer_queue.try_pop(ev);
-            //cout << "ÀÛµ¿ÇÔ?" << endl;
+            
             dura = ev.start_time - chrono::system_clock::now();
             if (dura <= 0ms) {
                 EXP_OVER* ex_over = new EXP_OVER;
                 ex_over->_comp_op = OP_NPC_MOVE;
-                PostQueuedCompletionStatus(g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);   //0Àº ¼ÒÄÏÃë±ŞÀ» ¹ŞÀ½
+                PostQueuedCompletionStatus(g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);   //0ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ ï¿½ï¿½ï¿½ï¿½
             }
             else if (dura <= waittime) {
                 temp = ev;
@@ -918,186 +897,6 @@ void do_timer() {
     }
 }
 
-//
-//BOOL LoadDB(string t)
-//{
-//    SQLHENV henv;
-//    SQLHDBC hdbc;
-//    SQLHSTMT hstmt = 0;
-//    SQLRETURN retcode;
-//    SQLINTEGER p_id;
-//
-//    SQLSMALLINT p_level;
-//    string temp = "EXEC LoadPlayerID " + t;
-//    wstring tmp;
-//    tmp.assign(temp.begin(), temp.end());
-//    SQLWCHAR p_Name[NAME_LEN];
-//    SQLLEN cbName = 0, cbP_ID = 0, cbP_Level = 0, cbP_X = 0, cbP_Y = 0;
-//    SQLLEN cbP_HP = 0, cbP_MAXHP = 0, cbP_EXP = 0, cbP_LV = 0;
-//    setlocale(LC_ALL, "korean");
-//
-//    // Allocate environment handle  
-//    retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
-//
-//    // Set the ODBC version environment attribute  
-//    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//        retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);
-//
-//        // Allocate connection handle  
-//        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//            retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
-//
-//            // Set login timeout to 5 seconds  
-//            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//                SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-//
-//                // Connect to data source  
-//                retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2021_GServer_ODBC", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
-//
-//                // Allocate statement handle  
-//                if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//                //    cout << "ODBC Connected," << endl;
-//                    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-//
-//                    //retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"EXEC LoadPlayerID Youngin", SQL_NTS);
-//                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)tmp.c_str(), SQL_NTS);
-//                    //retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT Player_ID, Player_name, Player_Level FROM Player_data", SQL_NTS);
-//                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//
-//                        // Bind columns 1, 2, and 3  
-//                        //retcode = SQLBindCol(hstmt, 1, SQL_C_LONG, &p_id, 100, &cbP_ID);
-//                        retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, p_Name, NAME_LEN, &cbName);
-//                        retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &p_x, 10, &cbP_X);
-//                        retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &p_y, 10, &cbP_Y);
-//                        retcode = SQLBindCol(hstmt, 4, SQL_C_LONG, &p_lv, 10, &cbP_LV);
-//                        retcode = SQLBindCol(hstmt, 5, SQL_C_LONG, &p_hp, 10, &cbP_HP);
-//                        retcode = SQLBindCol(hstmt, 6, SQL_C_LONG, &p_maxhp, 10, &cbP_MAXHP);
-//
-//                        // Fetch and print each row of data. On an error, display a message and exit.  
-//                        for (int i = 0; ; i++) {
-//                            retcode = SQLFetch(hstmt);
-//                            if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) show_error();
-//                            else HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
-//                            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
-//                            {
-//                                //replace wprintf with printf
-//                                //%S with %ls
-//                                //warning C4477: 'wprintf' : format string '%S' requires an argument of type 'char *'
-//                                //but variadic argument 2 has type 'SQLWCHAR *'
-//                                //wprintf(L"%d: %S %S %S\n", i + 1, sCustID, szName, szPhone);  
-//                                wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
-//                            }
-//                            else
-//                                return false;
-//                            break;
-//                        }
-//                    }
-//
-//                    // Process data  
-//                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//                        SQLCancel(hstmt);
-//                        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-//                    }
-//
-//                    SQLDisconnect(hdbc);
-//                }
-//
-//                SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
-//            }
-//        }
-//        SQLFreeHandle(SQL_HANDLE_ENV, henv);
-//    }
-//    return true;
-//}
-
-//
-//void UpdatePlayerOnDB(int c_id)
-//{
-//    CLIENT& CL = clients[c_id];
-//    string t = CL.name;
-//    //string x = to_string(CL.x);
-//
-//    SQLHENV henv;
-//    SQLHDBC hdbc;
-//    SQLHSTMT hstmt = 0;
-//    SQLRETURN retcode;
-//    SQLINTEGER p_id;
-//
-//    SQLSMALLINT p_level;
-//    //string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + to_string(CL.x) + ", @Param2 = " + to_string(CL.y);
-//    string temp = "EXEC UpdatePlayer @Param = " + t + ", @Param1 = " + to_string(CL.x) + ", @Param2 = " + to_string(CL.y) + ", @Param3 = " + to_string(CL.hp) + ", @Param4 = " + to_string(CL.maxhp) + ", @Param5 = " + to_string(CL.exp) + ", @Param6 = " + to_string(CL.level);
-//    cout << temp << endl;
-//    wstring tmp;
-//    tmp.assign(temp.begin(), temp.end());
-//    SQLWCHAR p_Name[NAME_LEN];
-//    SQLLEN cbName = 0, cbP_ID = 0, cbP_Level = 0, cbP_X = 0, cbP_Y = 0;
-//
-//    setlocale(LC_ALL, "korean");
-//
-//    // Allocate environment handle  
-//    retcode = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &henv);
-//
-//    // Set the ODBC version environment attribute  
-//    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//        retcode = SQLSetEnvAttr(henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER*)SQL_OV_ODBC3, 0);
-//
-//        // Allocate connection handle  
-//        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//            retcode = SQLAllocHandle(SQL_HANDLE_DBC, henv, &hdbc);
-//
-//            // Set login timeout to 5 seconds  
-//            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//                SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
-//
-//                // Connect to data source  
-//                retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2021_GServer_ODBC", SQL_NTS, (SQLWCHAR*)NULL, 0, NULL, 0);
-//
-//                // Allocate statement handle  
-//                if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//               //     cout << "ODBC Connected," << endl;
-//                    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
-//
-//                    //retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"EXEC LoadPlayerID Youngin", SQL_NTS);
-//                    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)tmp.c_str(), SQL_NTS);
-//                    //retcode = SQLExecDirect(hstmt, (SQLWCHAR*)L"SELECT Player_ID, Player_name, Player_Level FROM Player_data", SQL_NTS);
-//                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//
-//                        // Bind columns 1, 2, and 3  
-//                        //retcode = SQLBindCol(hstmt, 1, SQL_C_LONG, &p_id, 100, &cbP_ID);
-//                        retcode = SQLBindCol(hstmt, 1, SQL_C_WCHAR, p_Name, NAME_LEN, &cbName);
-//                        //retcode = SQLBindCol(hstmt, 3, SQL_C_SHORT, &p_level, 10, &cbP_Level);
-//                        retcode = SQLBindCol(hstmt, 2, SQL_C_LONG, &p_x, 10, &cbP_Y);
-//                        retcode = SQLBindCol(hstmt, 3, SQL_C_LONG, &p_y, 10, &cbP_X);
-//
-//                        // Fetch and print each row of data. On an error, display a message and exit.  
-//                        for (int i = 0; ; i++) {
-//                            retcode = SQLFetch(hstmt);
-//                            if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) show_error();
-//                            else HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
-//                            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
-//                            {
-//                                wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
-//                            }
-//                            else
-//                                break;
-//                        }
-//                    }
-//
-//                    // Process data  
-//                    if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
-//                        SQLCancel(hstmt);
-//                        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-//                    }
-//
-//                    SQLDisconnect(hdbc);
-//                }
-//
-//                SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
-//            }
-//        }
-//        SQLFreeHandle(SQL_HANDLE_ENV, henv);
-//    }
-//}
 
 int main()
 {
@@ -1143,7 +942,7 @@ int main()
     vector <thread> worker_threads;
     //thread ai_thread{ do_ai };
     thread timer_thread{ do_timer };
-    for (int i = 0; i < 6; ++i)
+    for (int i = 0; i < 16; ++i)
         worker_threads.emplace_back(worker);
     for (auto& th : worker_threads)
         th.join();
@@ -1156,4 +955,5 @@ int main()
     }
     closesocket(g_s_socket);
     WSACleanup();
+    Disconnect_DB();
 }

@@ -96,13 +96,15 @@ bool Add_DB(char* ID, char* pwd, char* nickname)
             if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) {
                 HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
             }
+            //else if(retcode == )          
         }
         else {
+            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
             return false;
         }
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
         return true;
     }
-    
     return false;
 }
 
@@ -158,9 +160,11 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
                     wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
                 }
                 else
+                    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
                     break;
             }
         }
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     }
 }
 
@@ -194,8 +198,9 @@ bool Load_DB(char* ID, char* PW)
        retcode = SQLBindCol(hstmt, 6, SQL_C_LONG, &p_maxhp, 10, &cbP_MAXHP);
        retcode = SQLBindCol(hstmt, 7, SQL_C_LONG, &p_exp, 10, &cbP_EXP);
 
+       retcode = SQLFetch(hstmt);
+       
        for (int i = 0; ; i++) {
-           retcode = SQLFetch(hstmt);
            if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) show_error();
            else HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
            if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
@@ -203,11 +208,13 @@ bool Load_DB(char* ID, char* PW)
                wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
            }
            else
+               SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
                return false;
            break;
        }
    }
-
+   else
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     return true;
 }
 
@@ -238,7 +245,7 @@ void UpdatePlayerOnDB(int c_id, CLIENT& client)
 
 bool DB_Injection(std::string word)
 {
-    const std::string allowableCharacters = "abcdefghijklmnopqrstuvwxyz0123456789!#^";
+    const std::string allowableCharacters = "abcdefghijklmnopqrstuvwxyz0123456789!^";
 
     for (char ch : word)
     {
@@ -254,7 +261,7 @@ bool DB_Injection(std::string word)
 
 void Disconnect_DB()
 {
-    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+    
     SQLDisconnect(hdbc);
     SQLFreeHandle(SQL_HANDLE_DBC, hdbc);
     SQLFreeHandle(SQL_HANDLE_ENV, henv);
