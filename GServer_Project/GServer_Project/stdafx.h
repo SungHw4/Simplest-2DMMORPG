@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-#include "2021_°¡À»_protocol.h"
+#include "2021_ï¿½ï¿½ï¿½ï¿½_protocol.h"
 #include "enum.h"
 #include <string>
 #include <vector>
@@ -10,6 +10,7 @@
 #include <thread>
 #include <array>
 #include <mutex>
+#include <functional>
 #include <unordered_set>
 #include <concurrent_priority_queue.h>
 
