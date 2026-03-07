@@ -31,6 +31,22 @@ void npcmove(int npc_id);
 
 array <CLIENT, MAX_USER + MAX_NPC> clients;
 
+// Helper function to lock two viewlists in a consistent order to prevent deadlock
+void lock_two_viewlists(int id1, int id2, std::function<void()> callback)
+{
+    if (id1 == id2) {
+        lock_guard<mutex> lock(clients[id1].vl);
+        callback();
+    } else if (id1 < id2) {
+        lock_guard<mutex> lock1(clients[id1].vl);
+        lock_guard<mutex> lock2(clients[id2].vl);
+        callback();
+    } else {
+        lock_guard<mutex> lock1(clients[id2].vl);
+        lock_guard<mutex> lock2(clients[id1].vl);
+        callback();
+    }
+}
 
 bool is_near(int a, int b)
 {
@@ -71,15 +87,14 @@ bool is_player(int id)
 int get_new_id()
 {
     static int g_id = 0;
+    static mutex id_allocation_mutex;
+    lock_guard<mutex> lock(id_allocation_mutex);
 
     for (int i = 0; i < MAX_USER; ++i) {
-        clients[i].state_lock.lock();
         if (ST_FREE == clients[i]._state) {
             clients[i]._state = ST_ACCEPT;
-            clients[i].state_lock.unlock();
             return i;
         }
-        clients[i].state_lock.unlock();
     }
     cout << "Maximum Number of Clients Overflow!!\n";
     return -1;
@@ -195,7 +210,7 @@ void Disconnect(int c_id)
     cl.vl.unlock();
     for (auto& other : my_vl) {
         CLIENT& target = clients[other];
-        if (true == is_npc(target._id)) break;
+        if (true == is_npc(target._id)) continue;
         if (ST_INGAME != target._state)
             continue;
         target.vl.lock();
@@ -443,7 +458,7 @@ void process_packet(int client_id, unsigned char* p)
             }
             // 계속 시야에 들어온 플레이어 처리
             else {
-                if (true == is_npc(other)) break; //원래있던거는 어차피 npc_move에서 처리함
+                if (true == is_npc(other)) continue; //원래있던거는 어차피 npc_move에서 처리함
 
                 clients[other].vl.lock();
                 if (0 != clients[other].viewlist.count(cl._id)) {
@@ -465,7 +480,7 @@ void process_packet(int client_id, unsigned char* p)
                 cl.vl.unlock();
                 send_remove_object(cl._id, other);
 
-                if (true == is_npc(other)) break;
+                if (true == is_npc(other)) continue;
 
                 clients[other].vl.lock();
                 if (0 != clients[other].viewlist.count(cl._id)) {
@@ -593,7 +608,7 @@ void worker()
                 break;
         }
         case OP_PLAYER_MOVE: {
-            //clients[client_id].Lua_Lock.lock();
+            clients[client_id].Lua_Lock.lock();
             lua_State* L = clients[client_id].L;
             lua_getglobal(L, "event_player_move");
             lua_pushnumber(L, exp_over->_target);
@@ -601,7 +616,7 @@ void worker()
             if (error != 0) {
                 cout << lua_tostring(L, -1) << endl;
             }
-            //clients[client_id].Lua_Lock.unlock();
+            clients[client_id].Lua_Lock.unlock();
             delete exp_over;
             break;
         }
@@ -769,7 +784,7 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
     for(auto& obj : clients)
     {
         if(obj.get_state() != ST_INGAME) continue;
-        if (true == is_npc(obj.get_id())) break;
+        if (true == is_npc(obj.get_id())) continue;
         if(true == is_near(npc_id ,obj.get_id()))
         {
             new_viewlist.insert(obj.get_id());

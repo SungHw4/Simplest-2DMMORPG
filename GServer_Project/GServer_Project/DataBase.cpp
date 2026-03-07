@@ -96,14 +96,16 @@ bool Add_DB(char* ID, char* pwd, char* nickname)
             if (retcode == SQL_ERROR || retcode == SQL_SUCCESS_WITH_INFO) {
                 HandleDiagnosticRecord(hstmt, SQL_HANDLE_STMT, retcode);
             }
+            delete pcrow;
             //else if(retcode == )          
         }
-        else {
-            SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        delete[] exec;
+        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+        if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO) {
+            return true;
+        } else {
             return false;
         }
-        SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-        return true;
     }
     return false;
 }
@@ -122,7 +124,7 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
         //char temp[100];
         char tmp[100];
         
-        sprintf_s(tmp, sizeof(tmp), "EXEC UpdatePlayer %s, %s, %s, %s, %s, %s",CL.name, CL.level, CL.x, CL.y, CL.hp, CL.exp );
+        sprintf_s(tmp, sizeof(tmp), "EXEC UpdatePlayer '%s', %d, %d, %d, %d, %d",CL.name, CL.level, CL.x, CL.y, CL.hp, CL.exp );
        
         wchar_t* exec;
         int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
@@ -159,11 +161,13 @@ void Update_DB(char* ID, char* pwd, CLIENT client)
                 {
                     wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
                 }
-                else
+                else {
                     SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
                     break;
+                }
             }
         }
+        delete[] exec;
         SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
     }
 }
@@ -178,7 +182,7 @@ bool Load_DB(char* ID, char* PW)
     SQLLEN cbName = 0, cbP_X = 0, cbP_Y = 0;
     SQLLEN cbP_HP = 0, cbP_MAXHP = 0, cbP_EXP = 0, cbP_LV = 0;
 
-    sprintf_s(tmp, sizeof(tmp), "EXEC LoadPlayerID %s %s", ID, PW );
+    sprintf_s(tmp, sizeof(tmp), "EXEC LoadPlayerID '%s', '%s'", ID, PW );
 
     wchar_t* exec;
     int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
@@ -207,15 +211,22 @@ bool Load_DB(char* ID, char* PW)
            {
                wprintf(L"%d: %s %d %d\n", i + 1, p_Name, p_x, p_y);
            }
-           else
+           else {
+               delete[] exec;
                SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
                return false;
+           }
            break;
        }
    }
-   else
-    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
-    return true;
+   else {
+       delete[] exec;
+       SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+       return false;
+   }
+   delete[] exec;
+   SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
+   return true;
 }
 
 void UpdatePlayerOnDB(int c_id, CLIENT& client)
@@ -234,13 +245,18 @@ void UpdatePlayerOnDB(int c_id, CLIENT& client)
     //wstring tmp;
     //tmp.assign(temp.begin(), temp.end());
     char tmp[100];
-    sprintf_s(tmp, sizeof(tmp), "EXEC UpdatePlayer %s, %s, %s, %s, %s, %s", CL.name, CL.level, CL.x, CL.y, CL.hp, CL.exp);
+    sprintf_s(tmp, sizeof(tmp), "EXEC UpdatePlayer '%s', %d, %d, %d, %d, %d", CL.name, CL.level, CL.x, CL.y, CL.hp, CL.exp);
 
     wchar_t* exec;
     int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);
     exec = new WCHAR[strSize];
     MultiByteToWideChar(CP_ACP, 0, tmp, sizeof(tmp) + 1, exec, strSize);
 
+    retcode = SQLAllocHandle(SQL_HANDLE_STMT, hdbc, &hstmt);
+    retcode = SQLExecDirect(hstmt, (SQLWCHAR*)exec, SQL_NTS);
+    
+    delete[] exec;
+    SQLFreeHandle(SQL_HANDLE_STMT, hstmt);
 }
 
 bool DB_Injection(std::string word)
