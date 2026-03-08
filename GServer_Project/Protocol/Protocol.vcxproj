@@ -84,32 +84,33 @@
   <ItemDefinitionGroup>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <CustomBuild Include="protocol.fbs">
+    <CustomBuild Include="game_protocol.fbs">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Generating %(Filename)_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Generating %(Filename)_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating %(Filename)_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating %(Filename)_generated.h from %(Filename).fbs</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)GServer_Project\%(Filename)_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)GServer_Project\%(Filename)_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)GServer_Project\%(Filename)_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)GServer_Project\%(Filename)_generated.h</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
+    </CustomBuild>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

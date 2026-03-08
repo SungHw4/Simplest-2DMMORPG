@@ -11,7 +11,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <CustomBuild Include="protocol.fbs">
+    <CustomBuild Include="game_protocol.fbs">
       <Filter>Schema Files</Filter>
     </CustomBuild>
   </ItemGroup>
