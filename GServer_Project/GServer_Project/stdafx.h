@@ -1,6 +1,6 @@
 #pragma once
 #include <iostream>
-#include "2021_����_protocol.h"
+#include "protocol.h"
 #include "enum.h"
 #include <string>
 #include <vector>
