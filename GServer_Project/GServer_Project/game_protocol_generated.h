@@ -63,23 +63,23 @@ struct CSMessageBuilder;
 struct SCMessage;
 struct SCMessageBuilder;
 
-enum class CSPacketType : int8_t {
-  LOGIN = 1,
-  MOVE = 2,
-  ATTACK = 3,
-  CHAT = 4,
-  TELEPORT = 5,
-  MIN = LOGIN,
-  MAX = TELEPORT
+enum CSPacketType : int8_t {
+  CSPacketType_LOGIN = 1,
+  CSPacketType_MOVE = 2,
+  CSPacketType_ATTACK = 3,
+  CSPacketType_CHAT = 4,
+  CSPacketType_TELEPORT = 5,
+  CSPacketType_MIN = CSPacketType_LOGIN,
+  CSPacketType_MAX = CSPacketType_TELEPORT
 };
 
 inline const CSPacketType (&EnumValuesCSPacketType())[5] {
   static const CSPacketType values[] = {
-    CSPacketType::LOGIN,
-    CSPacketType::MOVE,
-    CSPacketType::ATTACK,
-    CSPacketType::CHAT,
-    CSPacketType::TELEPORT
+    CSPacketType_LOGIN,
+    CSPacketType_MOVE,
+    CSPacketType_ATTACK,
+    CSPacketType_CHAT,
+    CSPacketType_TELEPORT
   };
   return values;
 }
@@ -97,38 +97,38 @@ inline const char * const *EnumNamesCSPacketType() {
 }
 
 inline const char *EnumNameCSPacketType(CSPacketType e) {
-  if (::flatbuffers::IsOutRange(e, CSPacketType::LOGIN, CSPacketType::TELEPORT)) return "";
-  const size_t index = static_cast<size_t>(e) - static_cast<size_t>(CSPacketType::LOGIN);
+  if (::flatbuffers::IsOutRange(e, CSPacketType_LOGIN, CSPacketType_TELEPORT)) return "";
+  const size_t index = static_cast<size_t>(e) - static_cast<size_t>(CSPacketType_LOGIN);
   return EnumNamesCSPacketType()[index];
 }
 
-enum class SCPacketType : int8_t {
-  LOGIN_OK = 1,
-  MOVE = 2,
-  PUT_OBJECT = 3,
-  REMOVE_OBJECT = 4,
-  CHAT = 5,
-  LOGIN_FAIL = 6,
-  STATUS_CHANGE = 7,
-  OBSTACLE = 8,
-  ATTACK = 9,
-  LOGIN_NO = 10,
-  MIN = LOGIN_OK,
-  MAX = LOGIN_NO
+enum SCPacketType : int8_t {
+  SCPacketType_LOGIN_OK = 1,
+  SCPacketType_MOVE = 2,
+  SCPacketType_PUT_OBJECT = 3,
+  SCPacketType_REMOVE_OBJECT = 4,
+  SCPacketType_CHAT = 5,
+  SCPacketType_LOGIN_FAIL = 6,
+  SCPacketType_STATUS_CHANGE = 7,
+  SCPacketType_OBSTACLE = 8,
+  SCPacketType_ATTACK = 9,
+  SCPacketType_LOGIN_NO = 10,
+  SCPacketType_MIN = SCPacketType_LOGIN_OK,
+  SCPacketType_MAX = SCPacketType_LOGIN_NO
 };
 
 inline const SCPacketType (&EnumValuesSCPacketType())[10] {
   static const SCPacketType values[] = {
-    SCPacketType::LOGIN_OK,
-    SCPacketType::MOVE,
-    SCPacketType::PUT_OBJECT,
-    SCPacketType::REMOVE_OBJECT,
-    SCPacketType::CHAT,
-    SCPacketType::LOGIN_FAIL,
-    SCPacketType::STATUS_CHANGE,
-    SCPacketType::OBSTACLE,
-    SCPacketType::ATTACK,
-    SCPacketType::LOGIN_NO
+    SCPacketType_LOGIN_OK,
+    SCPacketType_MOVE,
+    SCPacketType_PUT_OBJECT,
+    SCPacketType_REMOVE_OBJECT,
+    SCPacketType_CHAT,
+    SCPacketType_LOGIN_FAIL,
+    SCPacketType_STATUS_CHANGE,
+    SCPacketType_OBSTACLE,
+    SCPacketType_ATTACK,
+    SCPacketType_LOGIN_NO
   };
   return values;
 }
@@ -151,26 +151,26 @@ inline const char * const *EnumNamesSCPacketType() {
 }
 
 inline const char *EnumNameSCPacketType(SCPacketType e) {
-  if (::flatbuffers::IsOutRange(e, SCPacketType::LOGIN_OK, SCPacketType::LOGIN_NO)) return "";
-  const size_t index = static_cast<size_t>(e) - static_cast<size_t>(SCPacketType::LOGIN_OK);
+  if (::flatbuffers::IsOutRange(e, SCPacketType_LOGIN_OK, SCPacketType_LOGIN_NO)) return "";
+  const size_t index = static_cast<size_t>(e) - static_cast<size_t>(SCPacketType_LOGIN_OK);
   return EnumNamesSCPacketType()[index];
 }
 
-enum class Direction : int8_t {
-  UP = 0,
-  DOWN = 1,
-  LEFT = 2,
-  RIGHT = 3,
-  MIN = UP,
-  MAX = RIGHT
+enum Direction : int8_t {
+  Direction_UP = 0,
+  Direction_DOWN = 1,
+  Direction_LEFT = 2,
+  Direction_RIGHT = 3,
+  Direction_MIN = Direction_UP,
+  Direction_MAX = Direction_RIGHT
 };
 
 inline const Direction (&EnumValuesDirection())[4] {
   static const Direction values[] = {
-    Direction::UP,
-    Direction::DOWN,
-    Direction::LEFT,
-    Direction::RIGHT
+    Direction_UP,
+    Direction_DOWN,
+    Direction_LEFT,
+    Direction_RIGHT
   };
   return values;
 }
@@ -187,26 +187,26 @@ inline const char * const *EnumNamesDirection() {
 }
 
 inline const char *EnumNameDirection(Direction e) {
-  if (::flatbuffers::IsOutRange(e, Direction::UP, Direction::RIGHT)) return "";
+  if (::flatbuffers::IsOutRange(e, Direction_UP, Direction_RIGHT)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesDirection()[index];
 }
 
-enum class ObjectType : int8_t {
-  NONE = 0,
-  PLAYER = 1,
-  NPC_DOG = 2,
-  NPC_CAT = 3,
-  MIN = NONE,
-  MAX = NPC_CAT
+enum ObjectType : int8_t {
+  ObjectType_NONE = 0,
+  ObjectType_PLAYER = 1,
+  ObjectType_NPC_DOG = 2,
+  ObjectType_NPC_CAT = 3,
+  ObjectType_MIN = ObjectType_NONE,
+  ObjectType_MAX = ObjectType_NPC_CAT
 };
 
 inline const ObjectType (&EnumValuesObjectType())[4] {
   static const ObjectType values[] = {
-    ObjectType::NONE,
-    ObjectType::PLAYER,
-    ObjectType::NPC_DOG,
-    ObjectType::NPC_CAT
+    ObjectType_NONE,
+    ObjectType_PLAYER,
+    ObjectType_NPC_DOG,
+    ObjectType_NPC_CAT
   };
   return values;
 }
@@ -223,30 +223,30 @@ inline const char * const *EnumNamesObjectType() {
 }
 
 inline const char *EnumNameObjectType(ObjectType e) {
-  if (::flatbuffers::IsOutRange(e, ObjectType::NONE, ObjectType::NPC_CAT)) return "";
+  if (::flatbuffers::IsOutRange(e, ObjectType_NONE, ObjectType_NPC_CAT)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesObjectType()[index];
 }
 
-enum class CSPacket : uint8_t {
-  NONE = 0,
-  CSLogin = 1,
-  CSMove = 2,
-  CSAttack = 3,
-  CSChat = 4,
-  CSTeleport = 5,
-  MIN = NONE,
-  MAX = CSTeleport
+enum CSPacket : uint8_t {
+  CSPacket_NONE = 0,
+  CSPacket_CSLogin = 1,
+  CSPacket_CSMove = 2,
+  CSPacket_CSAttack = 3,
+  CSPacket_CSChat = 4,
+  CSPacket_CSTeleport = 5,
+  CSPacket_MIN = CSPacket_NONE,
+  CSPacket_MAX = CSPacket_CSTeleport
 };
 
 inline const CSPacket (&EnumValuesCSPacket())[6] {
   static const CSPacket values[] = {
-    CSPacket::NONE,
-    CSPacket::CSLogin,
-    CSPacket::CSMove,
-    CSPacket::CSAttack,
-    CSPacket::CSChat,
-    CSPacket::CSTeleport
+    CSPacket_NONE,
+    CSPacket_CSLogin,
+    CSPacket_CSMove,
+    CSPacket_CSAttack,
+    CSPacket_CSChat,
+    CSPacket_CSTeleport
   };
   return values;
 }
@@ -265,65 +265,65 @@ inline const char * const *EnumNamesCSPacket() {
 }
 
 inline const char *EnumNameCSPacket(CSPacket e) {
-  if (::flatbuffers::IsOutRange(e, CSPacket::NONE, CSPacket::CSTeleport)) return "";
+  if (::flatbuffers::IsOutRange(e, CSPacket_NONE, CSPacket_CSTeleport)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesCSPacket()[index];
 }
 
 template<typename T> struct CSPacketTraits {
-  static const CSPacket enum_value = CSPacket::NONE;
+  static const CSPacket enum_value = CSPacket_NONE;
 };
 
 template<> struct CSPacketTraits<GameProtocol::CSLogin> {
-  static const CSPacket enum_value = CSPacket::CSLogin;
+  static const CSPacket enum_value = CSPacket_CSLogin;
 };
 
 template<> struct CSPacketTraits<GameProtocol::CSMove> {
-  static const CSPacket enum_value = CSPacket::CSMove;
+  static const CSPacket enum_value = CSPacket_CSMove;
 };
 
 template<> struct CSPacketTraits<GameProtocol::CSAttack> {
-  static const CSPacket enum_value = CSPacket::CSAttack;
+  static const CSPacket enum_value = CSPacket_CSAttack;
 };
 
 template<> struct CSPacketTraits<GameProtocol::CSChat> {
-  static const CSPacket enum_value = CSPacket::CSChat;
+  static const CSPacket enum_value = CSPacket_CSChat;
 };
 
 template<> struct CSPacketTraits<GameProtocol::CSTeleport> {
-  static const CSPacket enum_value = CSPacket::CSTeleport;
+  static const CSPacket enum_value = CSPacket_CSTeleport;
 };
 
 bool VerifyCSPacket(::flatbuffers::Verifier &verifier, const void *obj, CSPacket type);
-bool VerifyCSPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<CSPacket> *types);
+bool VerifyCSPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types);
 
-enum class SCPacket : uint8_t {
-  NONE = 0,
-  SCLoginOk = 1,
-  SCMove = 2,
-  SCPutObject = 3,
-  SCRemoveObject = 4,
-  SCChat = 5,
-  SCLoginFail = 6,
-  SCStatusChange = 7,
-  SCAttack = 8,
-  SCObstacle = 9,
-  MIN = NONE,
-  MAX = SCObstacle
+enum SCPacket : uint8_t {
+  SCPacket_NONE = 0,
+  SCPacket_SCLoginOk = 1,
+  SCPacket_SCMove = 2,
+  SCPacket_SCPutObject = 3,
+  SCPacket_SCRemoveObject = 4,
+  SCPacket_SCChat = 5,
+  SCPacket_SCLoginFail = 6,
+  SCPacket_SCStatusChange = 7,
+  SCPacket_SCAttack = 8,
+  SCPacket_SCObstacle = 9,
+  SCPacket_MIN = SCPacket_NONE,
+  SCPacket_MAX = SCPacket_SCObstacle
 };
 
 inline const SCPacket (&EnumValuesSCPacket())[10] {
   static const SCPacket values[] = {
-    SCPacket::NONE,
-    SCPacket::SCLoginOk,
-    SCPacket::SCMove,
-    SCPacket::SCPutObject,
-    SCPacket::SCRemoveObject,
-    SCPacket::SCChat,
-    SCPacket::SCLoginFail,
-    SCPacket::SCStatusChange,
-    SCPacket::SCAttack,
-    SCPacket::SCObstacle
+    SCPacket_NONE,
+    SCPacket_SCLoginOk,
+    SCPacket_SCMove,
+    SCPacket_SCPutObject,
+    SCPacket_SCRemoveObject,
+    SCPacket_SCChat,
+    SCPacket_SCLoginFail,
+    SCPacket_SCStatusChange,
+    SCPacket_SCAttack,
+    SCPacket_SCObstacle
   };
   return values;
 }
@@ -346,53 +346,53 @@ inline const char * const *EnumNamesSCPacket() {
 }
 
 inline const char *EnumNameSCPacket(SCPacket e) {
-  if (::flatbuffers::IsOutRange(e, SCPacket::NONE, SCPacket::SCObstacle)) return "";
+  if (::flatbuffers::IsOutRange(e, SCPacket_NONE, SCPacket_SCObstacle)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSCPacket()[index];
 }
 
 template<typename T> struct SCPacketTraits {
-  static const SCPacket enum_value = SCPacket::NONE;
+  static const SCPacket enum_value = SCPacket_NONE;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCLoginOk> {
-  static const SCPacket enum_value = SCPacket::SCLoginOk;
+  static const SCPacket enum_value = SCPacket_SCLoginOk;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCMove> {
-  static const SCPacket enum_value = SCPacket::SCMove;
+  static const SCPacket enum_value = SCPacket_SCMove;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCPutObject> {
-  static const SCPacket enum_value = SCPacket::SCPutObject;
+  static const SCPacket enum_value = SCPacket_SCPutObject;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCRemoveObject> {
-  static const SCPacket enum_value = SCPacket::SCRemoveObject;
+  static const SCPacket enum_value = SCPacket_SCRemoveObject;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCChat> {
-  static const SCPacket enum_value = SCPacket::SCChat;
+  static const SCPacket enum_value = SCPacket_SCChat;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCLoginFail> {
-  static const SCPacket enum_value = SCPacket::SCLoginFail;
+  static const SCPacket enum_value = SCPacket_SCLoginFail;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCStatusChange> {
-  static const SCPacket enum_value = SCPacket::SCStatusChange;
+  static const SCPacket enum_value = SCPacket_SCStatusChange;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCAttack> {
-  static const SCPacket enum_value = SCPacket::SCAttack;
+  static const SCPacket enum_value = SCPacket_SCAttack;
 };
 
 template<> struct SCPacketTraits<GameProtocol::SCObstacle> {
-  static const SCPacket enum_value = SCPacket::SCObstacle;
+  static const SCPacket enum_value = SCPacket_SCObstacle;
 };
 
 bool VerifySCPacket(::flatbuffers::Verifier &verifier, const void *obj, SCPacket type);
-bool VerifySCPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<SCPacket> *types);
+bool VerifySCPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types);
 
 struct CSLogin FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef CSLoginBuilder Builder;
@@ -489,7 +489,7 @@ struct CSMoveBuilder {
 
 inline ::flatbuffers::Offset<CSMove> CreateCSMove(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    GameProtocol::Direction direction = GameProtocol::Direction::UP,
+    GameProtocol::Direction direction = GameProtocol::Direction_UP,
     int32_t move_time = 0) {
   CSMoveBuilder builder_(_fbb);
   builder_.add_move_time(move_time);
@@ -881,7 +881,7 @@ inline ::flatbuffers::Offset<SCPutObject> CreateSCPutObject(
     int16_t x = 0,
     int16_t y = 0,
     int32_t hp = 0,
-    GameProtocol::ObjectType object_type = GameProtocol::ObjectType::NONE,
+    GameProtocol::ObjectType object_type = GameProtocol::ObjectType_NONE,
     ::flatbuffers::Offset<::flatbuffers::String> name = 0) {
   SCPutObjectBuilder builder_(_fbb);
   builder_.add_name(name);
@@ -899,7 +899,7 @@ inline ::flatbuffers::Offset<SCPutObject> CreateSCPutObjectDirect(
     int16_t x = 0,
     int16_t y = 0,
     int32_t hp = 0,
-    GameProtocol::ObjectType object_type = GameProtocol::ObjectType::NONE,
+    GameProtocol::ObjectType object_type = GameProtocol::ObjectType_NONE,
     const char *name = nullptr) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   return GameProtocol::CreateSCPutObject(
@@ -1285,19 +1285,19 @@ struct CSMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   template<typename T> const T *packet_as() const;
   const GameProtocol::CSLogin *packet_as_CSLogin() const {
-    return packet_type() == GameProtocol::CSPacket::CSLogin ? static_cast<const GameProtocol::CSLogin *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::CSPacket_CSLogin ? static_cast<const GameProtocol::CSLogin *>(packet()) : nullptr;
   }
   const GameProtocol::CSMove *packet_as_CSMove() const {
-    return packet_type() == GameProtocol::CSPacket::CSMove ? static_cast<const GameProtocol::CSMove *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::CSPacket_CSMove ? static_cast<const GameProtocol::CSMove *>(packet()) : nullptr;
   }
   const GameProtocol::CSAttack *packet_as_CSAttack() const {
-    return packet_type() == GameProtocol::CSPacket::CSAttack ? static_cast<const GameProtocol::CSAttack *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::CSPacket_CSAttack ? static_cast<const GameProtocol::CSAttack *>(packet()) : nullptr;
   }
   const GameProtocol::CSChat *packet_as_CSChat() const {
-    return packet_type() == GameProtocol::CSPacket::CSChat ? static_cast<const GameProtocol::CSChat *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::CSPacket_CSChat ? static_cast<const GameProtocol::CSChat *>(packet()) : nullptr;
   }
   const GameProtocol::CSTeleport *packet_as_CSTeleport() const {
-    return packet_type() == GameProtocol::CSPacket::CSTeleport ? static_cast<const GameProtocol::CSTeleport *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::CSPacket_CSTeleport ? static_cast<const GameProtocol::CSTeleport *>(packet()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1351,7 +1351,7 @@ struct CSMessageBuilder {
 
 inline ::flatbuffers::Offset<CSMessage> CreateCSMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    GameProtocol::CSPacket packet_type = GameProtocol::CSPacket::NONE,
+    GameProtocol::CSPacket packet_type = GameProtocol::CSPacket_NONE,
     ::flatbuffers::Offset<void> packet = 0) {
   CSMessageBuilder builder_(_fbb);
   builder_.add_packet(packet);
@@ -1373,31 +1373,31 @@ struct SCMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   }
   template<typename T> const T *packet_as() const;
   const GameProtocol::SCLoginOk *packet_as_SCLoginOk() const {
-    return packet_type() == GameProtocol::SCPacket::SCLoginOk ? static_cast<const GameProtocol::SCLoginOk *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCLoginOk ? static_cast<const GameProtocol::SCLoginOk *>(packet()) : nullptr;
   }
   const GameProtocol::SCMove *packet_as_SCMove() const {
-    return packet_type() == GameProtocol::SCPacket::SCMove ? static_cast<const GameProtocol::SCMove *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCMove ? static_cast<const GameProtocol::SCMove *>(packet()) : nullptr;
   }
   const GameProtocol::SCPutObject *packet_as_SCPutObject() const {
-    return packet_type() == GameProtocol::SCPacket::SCPutObject ? static_cast<const GameProtocol::SCPutObject *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCPutObject ? static_cast<const GameProtocol::SCPutObject *>(packet()) : nullptr;
   }
   const GameProtocol::SCRemoveObject *packet_as_SCRemoveObject() const {
-    return packet_type() == GameProtocol::SCPacket::SCRemoveObject ? static_cast<const GameProtocol::SCRemoveObject *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCRemoveObject ? static_cast<const GameProtocol::SCRemoveObject *>(packet()) : nullptr;
   }
   const GameProtocol::SCChat *packet_as_SCChat() const {
-    return packet_type() == GameProtocol::SCPacket::SCChat ? static_cast<const GameProtocol::SCChat *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCChat ? static_cast<const GameProtocol::SCChat *>(packet()) : nullptr;
   }
   const GameProtocol::SCLoginFail *packet_as_SCLoginFail() const {
-    return packet_type() == GameProtocol::SCPacket::SCLoginFail ? static_cast<const GameProtocol::SCLoginFail *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCLoginFail ? static_cast<const GameProtocol::SCLoginFail *>(packet()) : nullptr;
   }
   const GameProtocol::SCStatusChange *packet_as_SCStatusChange() const {
-    return packet_type() == GameProtocol::SCPacket::SCStatusChange ? static_cast<const GameProtocol::SCStatusChange *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCStatusChange ? static_cast<const GameProtocol::SCStatusChange *>(packet()) : nullptr;
   }
   const GameProtocol::SCAttack *packet_as_SCAttack() const {
-    return packet_type() == GameProtocol::SCPacket::SCAttack ? static_cast<const GameProtocol::SCAttack *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCAttack ? static_cast<const GameProtocol::SCAttack *>(packet()) : nullptr;
   }
   const GameProtocol::SCObstacle *packet_as_SCObstacle() const {
-    return packet_type() == GameProtocol::SCPacket::SCObstacle ? static_cast<const GameProtocol::SCObstacle *>(packet()) : nullptr;
+    return packet_type() == GameProtocol::SCPacket_SCObstacle ? static_cast<const GameProtocol::SCObstacle *>(packet()) : nullptr;
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1467,7 +1467,7 @@ struct SCMessageBuilder {
 
 inline ::flatbuffers::Offset<SCMessage> CreateSCMessage(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    GameProtocol::SCPacket packet_type = GameProtocol::SCPacket::NONE,
+    GameProtocol::SCPacket packet_type = GameProtocol::SCPacket_NONE,
     ::flatbuffers::Offset<void> packet = 0) {
   SCMessageBuilder builder_(_fbb);
   builder_.add_packet(packet);
@@ -1477,26 +1477,26 @@ inline ::flatbuffers::Offset<SCMessage> CreateSCMessage(
 
 inline bool VerifyCSPacket(::flatbuffers::Verifier &verifier, const void *obj, CSPacket type) {
   switch (type) {
-    case CSPacket::NONE: {
+    case CSPacket_NONE: {
       return true;
     }
-    case CSPacket::CSLogin: {
+    case CSPacket_CSLogin: {
       auto ptr = reinterpret_cast<const GameProtocol::CSLogin *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case CSPacket::CSMove: {
+    case CSPacket_CSMove: {
       auto ptr = reinterpret_cast<const GameProtocol::CSMove *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case CSPacket::CSAttack: {
+    case CSPacket_CSAttack: {
       auto ptr = reinterpret_cast<const GameProtocol::CSAttack *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case CSPacket::CSChat: {
+    case CSPacket_CSChat: {
       auto ptr = reinterpret_cast<const GameProtocol::CSChat *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case CSPacket::CSTeleport: {
+    case CSPacket_CSTeleport: {
       auto ptr = reinterpret_cast<const GameProtocol::CSTeleport *>(obj);
       return verifier.VerifyTable(ptr);
     }
@@ -1504,7 +1504,7 @@ inline bool VerifyCSPacket(::flatbuffers::Verifier &verifier, const void *obj, C
   }
 }
 
-inline bool VerifyCSPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<CSPacket> *types) {
+inline bool VerifyCSPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {
@@ -1518,42 +1518,42 @@ inline bool VerifyCSPacketVector(::flatbuffers::Verifier &verifier, const ::flat
 
 inline bool VerifySCPacket(::flatbuffers::Verifier &verifier, const void *obj, SCPacket type) {
   switch (type) {
-    case SCPacket::NONE: {
+    case SCPacket_NONE: {
       return true;
     }
-    case SCPacket::SCLoginOk: {
+    case SCPacket_SCLoginOk: {
       auto ptr = reinterpret_cast<const GameProtocol::SCLoginOk *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCMove: {
+    case SCPacket_SCMove: {
       auto ptr = reinterpret_cast<const GameProtocol::SCMove *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCPutObject: {
+    case SCPacket_SCPutObject: {
       auto ptr = reinterpret_cast<const GameProtocol::SCPutObject *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCRemoveObject: {
+    case SCPacket_SCRemoveObject: {
       auto ptr = reinterpret_cast<const GameProtocol::SCRemoveObject *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCChat: {
+    case SCPacket_SCChat: {
       auto ptr = reinterpret_cast<const GameProtocol::SCChat *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCLoginFail: {
+    case SCPacket_SCLoginFail: {
       auto ptr = reinterpret_cast<const GameProtocol::SCLoginFail *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCStatusChange: {
+    case SCPacket_SCStatusChange: {
       auto ptr = reinterpret_cast<const GameProtocol::SCStatusChange *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCAttack: {
+    case SCPacket_SCAttack: {
       auto ptr = reinterpret_cast<const GameProtocol::SCAttack *>(obj);
       return verifier.VerifyTable(ptr);
     }
-    case SCPacket::SCObstacle: {
+    case SCPacket_SCObstacle: {
       auto ptr = reinterpret_cast<const GameProtocol::SCObstacle *>(obj);
       return verifier.VerifyTable(ptr);
     }
@@ -1561,7 +1561,7 @@ inline bool VerifySCPacket(::flatbuffers::Verifier &verifier, const void *obj, S
   }
 }
 
-inline bool VerifySCPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<SCPacket> *types) {
+inline bool VerifySCPacketVector(::flatbuffers::Verifier &verifier, const ::flatbuffers::Vector<::flatbuffers::Offset<void>> *values, const ::flatbuffers::Vector<uint8_t> *types) {
   if (!values || !types) return !values && !types;
   if (values->size() != types->size()) return false;
   for (::flatbuffers::uoffset_t i = 0; i < values->size(); ++i) {

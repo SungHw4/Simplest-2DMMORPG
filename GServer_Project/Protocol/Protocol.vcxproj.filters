@@ -15,4 +15,9 @@
       <Filter>Schema Files</Filter>
     </CustomBuild>
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\GServer_Project\game_protocol_generated.h">
+      <Filter>Generated Files</Filter>
+    </ClInclude>
+  </ItemGroup>
 </Project>
