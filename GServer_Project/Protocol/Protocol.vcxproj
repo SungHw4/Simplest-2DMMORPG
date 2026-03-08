@@ -87,25 +87,25 @@
     <CustomBuild Include="protocol.fbs">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">echo Generating FlatBuffers protocol headers...
-"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
+"$(ProjectDir)flatc.exe" --cpp --no-warnings --filename-base game_protocol -o "$(SolutionDir)GServer_Project\" "%(FullPath)"
 </Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Generating FlatBuffers header from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Generating FlatBuffers header from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating FlatBuffers header from %(Filename).fbs</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating FlatBuffers header from %(Filename).fbs</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)protocol_generated.h</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)protocol_generated.h</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating game_protocol_generated.h from %(Filename).fbs</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)GServer_Project\game_protocol_generated.h</Outputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
       <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>

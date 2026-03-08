@@ -241,258 +241,278 @@ void Activate_NPC_Move_Event(int target, int player_id)
     exp_over->_target = player_id;
     PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
 }
-void process_packet(int client_id, unsigned char* p)
+// -----------------------------------------------------------------------
+// 패킷 타입별 핸들러 함수
+// -----------------------------------------------------------------------
+
+void handle_login(int client_id, unsigned char* p)
 {
-    unsigned char packet_type = p[1];
     CLIENT& cl = clients[client_id];
+    cs_packet_login* packet = reinterpret_cast<cs_packet_login*>(p);
+    strcpy_s(cl.name, packet->name);
 
-    switch (packet_type) {
-    case CS_PACKET_LOGIN: {
-        cs_packet_login* packet = reinterpret_cast<cs_packet_login*>(p);
-        strcpy_s(cl.name, packet->name);
-        if (Load_DB(cl.name)) {
-            cl.x = p_x;
-            cl.y = p_y;
-            cl.level = p_lv;
-            cl.maxhp = p_maxhp;
-            cl.hp = p_hp;
-            cl.exp = p_exp;
-            cl.dmg = 10 + (p_lv*3);
-            send_login_ok_packet(client_id);
-        }
-        else
-        {
-            send_login_no_packet(client_id);
-        }
-        CLIENT& cl = clients[client_id];
-        cl.state_lock.lock();
-        cl._state = ST_INGAME;
-        cl.state_lock.unlock();
+    if (Load_DB(cl.name)) {
+        cl.x     = p_x;
+        cl.y     = p_y;
+        cl.level = p_lv;
+        cl.maxhp = p_maxhp;
+        cl.hp    = p_hp;
+        cl.exp   = p_exp;
+        cl.dmg   = 10 + (p_lv * 3);
+        send_login_ok_packet(client_id);
+    }
+    else {
+        send_login_no_packet(client_id);
+    }
 
-        // ���� ������ �÷��̾��� ������ ���� �÷��̾�� ������
-        for (auto& other : clients) {
-            if (other._id == client_id) continue;
+    cl.state_lock.lock();
+    cl._state = ST_INGAME;
+    cl.state_lock.unlock();
 
-            other.state_lock.lock();
-            if (ST_INGAME != other._state) {
-                other.state_lock.unlock();
-                continue;
-            }
+    // 새로 접속한 플레이어를 기존 플레이어들에게 알림
+    for (auto& other : clients) {
+        if (other._id == client_id) continue;
+
+        other.state_lock.lock();
+        if (ST_INGAME != other._state) {
             other.state_lock.unlock();
+            continue;
+        }
+        other.state_lock.unlock();
 
-            if (false == is_near(other._id, client_id))
-                continue;
+        if (false == is_near(other._id, client_id))
+            continue;
 
-            if (true == is_npc(other._id)) {
+        if (true == is_npc(other._id)) {
+            timer_event ev;
+            ev.obj_id     = other._id;
+            ev.target_id  = client_id;
+            ev.start_time = chrono::system_clock::now() + 1s;
+            ev.ev         = EVENT_NPC_MOVE;
+            timer_queue.push(ev);
+            continue;
+        }
+
+        other.vl.lock();
+        other.viewlist.insert(client_id);
+        other.vl.unlock();
+
+        sc_packet_put_object pkt;
+        pkt.id          = client_id;
+        strcpy_s(pkt.name, cl.name);
+        pkt.object_type = cl._type;
+        pkt.size        = sizeof(pkt);
+        pkt.type        = SC_PACKET_PUT_OBJECT;
+        pkt.x           = cl.x;
+        pkt.hp          = cl.hp;
+        pkt.y           = cl.y;
+        other.do_send(sizeof(pkt), &pkt);
+    }
+
+    // 새로 접속한 플레이어에게 주변 오브젝트 정보 전송
+    for (auto& other : clients) {
+        if (other._id == client_id) continue;
+
+        other.state_lock.lock();
+        if (ST_INGAME != other._state) {
+            other.state_lock.unlock();
+            continue;
+        }
+        other.state_lock.unlock();
+
+        if (false == is_near(other._id, client_id))
+            continue;
+
+        clients[client_id].vl.lock();
+        clients[client_id].viewlist.insert(other._id);
+        clients[client_id].vl.unlock();
+
+        sc_packet_put_object pkt;
+        pkt.id          = other._id;
+        strcpy_s(pkt.name, other.name);
+        pkt.object_type = other._type;
+        pkt.size        = sizeof(pkt);
+        pkt.type        = SC_PACKET_PUT_OBJECT;
+        pkt.x           = other.x;
+        pkt.hp          = other.hp;
+        pkt.y           = other.y;
+        cl.do_send(sizeof(pkt), &pkt);
+    }
+}
+
+void handle_attack(int client_id, unsigned char* p)
+{
+    CLIENT& cl = clients[client_id];
+    cout << "1" << endl;
+
+    cl.vl.lock();
+    unordered_set<int> my_vl{ cl.viewlist };
+    cl.vl.unlock();
+
+    for (auto& k : my_vl)
+        cout << k << endl;
+
+    for (auto& k : my_vl) {
+        if (is_attack_range(client_id, k)) {
+            cout << "123" << endl;
+            sc_packet_attack* pkt = reinterpret_cast<sc_packet_attack*>(p);
+            clients[client_id].hp -= clients[k].dmg;
+            clients[k].hp         -= clients[client_id].dmg;
+            pkt->id   = k;
+            pkt->size = sizeof(pkt);
+            pkt->hp   = clients[k].hp;
+            pkt->x    = clients[k].x;
+            pkt->y    = clients[k].y;
+            pkt->exp  = clients[k].y;
+            pkt->type = SC_PACKET_ATTACK;
+            clients[client_id].do_send(sizeof(pkt), &pkt);
+        }
+    }
+
+    sc_packet_attack* pkt = reinterpret_cast<sc_packet_attack*>(p);
+    cout << clients[client_id].hp << endl;
+    pkt->id   = client_id;
+    pkt->size = sizeof(pkt);
+    pkt->hp   = clients[client_id].hp;
+    pkt->x    = clients[client_id].x;
+    pkt->y    = clients[client_id].y;
+    pkt->exp  = clients[client_id].y;
+    pkt->type = SC_PACKET_ATTACK;
+    clients[client_id].do_send(sizeof(pkt), &pkt);
+}
+
+void handle_move(int client_id, unsigned char* p)
+{
+    CLIENT& cl = clients[client_id];
+    cs_packet_move* packet = reinterpret_cast<cs_packet_move*>(p);
+    cl.last_move_time = packet->move_time;
+
+    int x = cl.x;
+    int y = cl.y;
+    switch (packet->direction) {
+    case 0: if (y > 0 && obs[y-1][x] == 0) y--; break;
+    case 1: if (y < (WORLD_HEIGHT - 1) && obs[y+1][x] == 0) y++; break;
+    case 2: if (x > 0 && obs[y][x-1] == 0) x--; break;
+    case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;
+    default:
+        cout << "Invalid move in client " << client_id << endl;
+        exit(-1);
+    }
+    cl.x = x;
+    cl.y = y;
+
+    unordered_set<int> nearlist;
+    for (auto& other : clients) {
+        if (other._id == client_id)
+            continue;
+        if (ST_INGAME != other.get_state())
+            continue;
+        if (false == is_near(client_id, other.get_id()))
+            continue;
+        if (true == is_npc(other.get_id())) {
+            if (other._is_active == false) {
+                other.set_active(true);
                 timer_event ev;
-                ev.obj_id = other._id;
-                ev.target_id = client_id;
+                ev.obj_id     = other.get_id();
                 ev.start_time = chrono::system_clock::now() + 1s;
-                ev.ev = EVENT_NPC_MOVE;
+                ev.target_id  = client_id;
+                timer_queue.push(ev);
+                Activate_Player_Move_Event(other.get_id(), cl.get_id());
+            }
+        }
+        nearlist.insert(other.get_id());
+    }
+
+    send_move_packet(cl._id, cl._id);
+
+    cl.vl.lock();
+    unordered_set<int> my_vl{ cl.viewlist };
+    cl.vl.unlock();
+
+    // 새로 시야에 들어온 오브젝트 처리
+    for (auto other : nearlist) {
+        if (0 == my_vl.count(other)) {
+            cl.vl.lock();
+            cl.viewlist.insert(other);
+            cl.vl.unlock();
+            send_put_object(cl._id, other);
+
+            if (true == is_npc(other)) {
+                timer_event ev;
+                ev.obj_id     = other;
+                ev.target_id  = client_id;
+                ev.start_time = chrono::system_clock::now() + 1s;
+                ev.ev         = EVENT_NPC_MOVE;
                 timer_queue.push(ev);
                 continue;
             }
 
-            other.vl.lock();
-            other.viewlist.insert(client_id);
-            other.vl.unlock();
-            sc_packet_put_object packet;
-            packet.id = client_id;
-            strcpy_s(packet.name, cl.name);
-            packet.object_type = cl._type;
-            packet.size = sizeof(packet);
-            packet.type = SC_PACKET_PUT_OBJECT;
-            packet.x = cl.x;
-            packet.hp = cl.hp;
-            packet.y = cl.y;
-            other.do_send(sizeof(packet), &packet);
-        }
-
-        // ���� ������ �÷��̾�� ���� ��ü ������ ������
-
-        for (auto& other : clients) {
-            if (other._id == client_id) continue;
-            other.state_lock.lock();
-            if (ST_INGAME != other._state) {
-                other.state_lock.unlock();
-                continue;
+            clients[other].vl.lock();
+            if (0 == clients[other].viewlist.count(cl._id)) {
+                clients[other].viewlist.insert(cl._id);
+                clients[other].vl.unlock();
+                send_put_object(other, cl._id);
             }
-            other.state_lock.unlock();
-
-            if (false == is_near(other._id, client_id))
-                continue;
-
-            clients[client_id].vl.lock();
-            clients[client_id].viewlist.insert(other._id);
-            clients[client_id].vl.unlock();
-
-            sc_packet_put_object packet;
-            packet.id = other._id;
-            strcpy_s(packet.name, other.name);
-            packet.object_type = other._type;
-            packet.size = sizeof(packet);
-            packet.type = SC_PACKET_PUT_OBJECT;
-            packet.x = other.x;
-            packet.hp = other.hp;
-            packet.y = other.y;
-            cl.do_send(sizeof(packet), &packet);
-        }
-        break;
-    }
-    case CS_PACKET_ATTACK: {
-        cout << "1" << endl;
-        cl.vl.lock();
-        unordered_set <int> my_vl{ cl.viewlist };
-        cl.vl.unlock();
-        for (auto& k : my_vl)
-            cout << k << endl;
-        
-        for (auto& k : my_vl) {
-            //cout << endl<< k << endl << endl;
-            if (is_attack_range(client_id, k))
-            {
-                cout << "123" << endl;
-                sc_packet_attack* packet = reinterpret_cast<sc_packet_attack*>(p);
-                clients[client_id].hp -= clients[k].dmg;
-                clients[k].hp -= clients[client_id].dmg;
-                packet->id = k;
-                packet->size = sizeof(packet);
-                packet->hp = clients[k].hp;
-                packet->x = clients[k].x;
-                packet->y = clients[k].y;
-                packet->exp = clients[k].y;
-                packet->type = SC_PACKET_ATTACK;
-                clients[client_id].do_send(sizeof(packet), &packet);
-            }
-        };
-        sc_packet_attack* packet = reinterpret_cast<sc_packet_attack*>(p);
-        cout << clients[client_id].hp << endl;
-        packet->id = client_id;
-        packet->size = sizeof(packet);
-        packet->hp = clients[client_id].hp;
-        packet->x = clients[client_id].x;
-        packet->y = clients[client_id].y;
-        packet->exp = clients[client_id].y;
-        packet->type = SC_PACKET_ATTACK;
-        clients[client_id].do_send(sizeof(packet), &packet);
-        break;
-    }
-                         
-    case CS_PACKET_MOVE: {
-        cs_packet_move* packet = reinterpret_cast<cs_packet_move*>(p);
-        cl.last_move_time = packet->move_time;
-        int x = cl.x;
-        int y = cl.y;
-        switch (packet->direction) {
-        case 0: if (y > 0 && obs[y-1][x] == 0) y--; break;
-        case 1: if (y < (WORLD_HEIGHT - 1) && obs[y+1][x] == 0) y++; break;
-        case 2: if (x > 0 && obs[y][x-1] == 0) x--; break;
-        case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;
-        default:
-            cout << "Invalid move in client " << client_id << endl;
-            exit(-1);
-        }
-        cl.x = x;
-        cl.y = y;
-
-        unordered_set <int> nearlist;
-            for (auto& other : clients) {
-                if (other._id == client_id)
-                    continue;
-                if (ST_INGAME != other.get_state())
-                    continue;
-                if (false == is_near(client_id, other.get_id()))
-                    continue;
-                if (true == is_npc(other.get_id())) {
-                    //Activate_Player_Move_Event(other._id, cl._id);
-                    if(other._is_active == false)
-                    {
-                        other.set_active(true);
-                        timer_event ev;
-                        ev.obj_id = other.get_id();
-                        ev.start_time = chrono::system_clock::now() + 1s;
-                        //ev.ev = EVENT_NPC_ATTACK;
-                        ev.target_id = client_id;
-                        timer_queue.push(ev);
-                        Activate_Player_Move_Event(other.get_id(), cl.get_id());
-                    }
-                }
-                nearlist.insert(other.get_id());
-            }
-
-        send_move_packet(cl._id, cl._id);
-
-        cl.vl.lock();
-        unordered_set <int> my_vl{ cl.viewlist };
-        cl.vl.unlock();
-
-        //새로 시야에 들어온 플레이어 처리
-        for (auto other : nearlist) {
-            if (0 == my_vl.count(other)) {
-                cl.vl.lock();
-                cl.viewlist.insert(other);
-                cl.vl.unlock();
-                send_put_object(cl._id, other);
-
-                if (true == is_npc(other)) {
-                    timer_event ev;
-                    ev.obj_id = other;
-                    ev.target_id = client_id;
-                    ev.start_time = chrono::system_clock::now() + 1s;
-                    ev.ev = EVENT_NPC_MOVE;
-                    timer_queue.push(ev);
-                    continue;
-                }
-                //if( true == is_npc(other)) break;
-
-                clients[other].vl.lock();
-                if (0 == clients[other].viewlist.count(cl._id)) {
-                    clients[other].viewlist.insert(cl._id);
-                    clients[other].vl.unlock();
-                    send_put_object(other, cl._id);
-                }
-                else {
-                    clients[other].vl.unlock();
-                    send_move_packet(other, cl._id);
-                }
-            }
-            // 계속 시야에 들어온 플레이어 처리
             else {
-                if (true == is_npc(other)) continue; //원래있던거는 어차피 npc_move에서 처리함
-
-                clients[other].vl.lock();
-                if (0 != clients[other].viewlist.count(cl._id)) {
-                    clients[other].vl.unlock();
-                    send_move_packet(other, cl._id);
-                }
-                else {
-                    clients[other].viewlist.insert(cl._id);
-                    clients[other].vl.unlock();
-                    send_put_object(other, cl._id);
-                }
+                clients[other].vl.unlock();
+                send_move_packet(other, cl._id);
             }
         }
-        // 시야에서 사라진 플레이어 처리
-        for (auto other : my_vl) {
-            if (0 == nearlist.count(other)) {
-                cl.vl.lock();
-                cl.viewlist.erase(other);
-                cl.vl.unlock();
-                send_remove_object(cl._id, other);
+        // 계속 시야에 있는 오브젝트 처리
+        else {
+            if (true == is_npc(other)) continue;
 
-                if (true == is_npc(other)) continue;
-
-                clients[other].vl.lock();
-                if (0 != clients[other].viewlist.count(cl._id)) {
-                    clients[other].viewlist.erase(cl._id);
-                    clients[other].vl.unlock();
-                    send_remove_object(other, cl._id);
-                }
-                else clients[other].vl.unlock();
+            clients[other].vl.lock();
+            if (0 != clients[other].viewlist.count(cl._id)) {
+                clients[other].vl.unlock();
+                send_move_packet(other, cl._id);
+            }
+            else {
+                clients[other].viewlist.insert(cl._id);
+                clients[other].vl.unlock();
+                send_put_object(other, cl._id);
             }
         }
     }
+
+    // 시야에서 사라진 오브젝트 처리
+    for (auto other : my_vl) {
+        if (0 == nearlist.count(other)) {
+            cl.vl.lock();
+            cl.viewlist.erase(other);
+            cl.vl.unlock();
+            send_remove_object(cl._id, other);
+
+            if (true == is_npc(other)) continue;
+
+            clients[other].vl.lock();
+            if (0 != clients[other].viewlist.count(cl._id)) {
+                clients[other].viewlist.erase(cl._id);
+                clients[other].vl.unlock();
+                send_remove_object(other, cl._id);
+            }
+            else clients[other].vl.unlock();
+        }
     }
+}
+
+// -----------------------------------------------------------------------
+// 전역 핸들러 매니저 정의
+// -----------------------------------------------------------------------
+PacketHandlerManager g_packet_handler;
+
+// 패킷 타입별 핸들러를 등록 (main에서 한 번 호출)
+void RegisterAllHandlers()
+{
+    g_packet_handler.RegisterHandler(CS_PACKET_LOGIN,  handle_login);
+    g_packet_handler.RegisterHandler(CS_PACKET_MOVE,   handle_move);
+    g_packet_handler.RegisterHandler(CS_PACKET_ATTACK, handle_attack);
+}
+
+// process_packet은 이제 단순 디스패처 역할만 수행
+void process_packet(int client_id, unsigned char* p)
+{
+    g_packet_handler.Dispatch(client_id, p);
 }
 
 void worker()
@@ -919,6 +939,7 @@ int main()
     Initialize_DB();
     Initialize_NPC();
     Initialize_obstacle();
+    RegisterAllHandlers();
     cout << "NPC initialize fin" << endl;
     wcout.imbue(locale("korean"));
     WSADATA WSAData;

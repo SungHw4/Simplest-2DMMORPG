@@ -44,6 +44,18 @@
 *.out
 *.app
 
+# FlatBuffers
+# Ignore flatbuffers downloads
+/flatbuffers-23.5.26/
+/flatbuffers.tar.gz
+/flatc
+/flatc.zip
+/flatc_windows.zip
+# But keep flatc.exe in Protocol folders
+!**/Protocol/flatc.exe
+# Ignore generated headers (will be regenerated)
+**/Protocol/Generated/*.h
+
 *.xml
 *.user
 
