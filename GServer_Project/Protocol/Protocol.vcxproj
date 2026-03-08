@@ -84,9 +84,6 @@
   <ItemDefinitionGroup>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <None Include="protocol.fbs" />
-  </ItemGroup>
-  <ItemGroup>
     <CustomBuild Include="protocol.fbs">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">echo Generating FlatBuffers protocol headers...

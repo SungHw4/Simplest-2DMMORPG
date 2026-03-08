@@ -1,23 +1,40 @@
 # Protocol Build System Guide
 
 ## 개요
-Protocol 프로젝트는 FlatBuffers 스키마를 자동으로 컴파일하여 C++ 헤더를 생성하는 Visual Studio 프로젝트입니다.
+Protocol 프로젝트는 FlatBuffers 스키마(`protocol.fbs`)를 자동으로 컴파일하여 C++ 헤더(`protocol_generated.h`)를 생성하는 Visual Studio Utility 프로젝트입니다. 솔루션 빌드 시 자동으로 실행되며, GServer_Project 및 GServer_Client에서 사용할 프로토콜 헤더를 생성합니다.
+
+## 주요 특징
+- ✅ **자동 빌드**: 솔루션 빌드 시 Protocol 프로젝트가 자동으로 먼저 실행됩니다
+- ✅ **의존성 관리**: 프로젝트 의존성 설정으로 빌드 순서 보장
+- ✅ **증분 빌드**: `.fbs` 파일 변경 시에만 재생성
+- ✅ **자동 배포**: 생성된 헤더를 자동으로 메인 프로젝트로 복사
+- ✅ **Visual Studio 통합**: 솔루션 탐색기에서 프로토콜 스키마 관리
 
 ## 프로젝트 구조
 
 ```
-GServer_Project/                   GServer_Client/
-├── Protocol/                      ├── Protocol/
-│   ├── protocol.fbs              │   ├── protocol.fbs
-│   ├── flatc.exe                 │   ├── flatc.exe
-│   ├── Protocol.vcxproj          │   ├── Protocol.vcxproj
-│   └── Generated/                │   └── Generated/
-│       └── protocol_generated.h  │       └── protocol_generated.h
-├── GServer_Project/              ├── GServer_Client/
-│   ├── protocol_generated.h (복사본)  │   ├── protocol_generated.h (복사본)
-│   └── ...                       │   └── ...
-└── GServer_Project.sln           └── GServer_Client.sln
+GServer_Project/                        GServer_Client/
+├── GServer_Project.sln                ├── GServer_Client.sln
+│   (Protocol → GServer_Project)       │   (Protocol → GServer_Client)
+├── Protocol/                          ├── Protocol/
+│   ├── protocol.fbs                   │   ├── protocol.fbs
+│   ├── flatc (또는 flatc.exe)         │   ├── flatc (또는 flatc.exe)
+│   ├── Protocol.vcxproj               │   ├── Protocol.vcxproj
+│   ├── Protocol.vcxproj.filters       │   ├── Protocol.vcxproj.filters
+│   └── Generated/                     │   └── Generated/
+│       └── protocol_generated.h       │       └── protocol_generated.h
+└── GServer_Project/                   └── GServer_Client/
+    ├── protocol_generated.h (자동복사)     ├── protocol_generated.h (자동복사)
+    └── ...                            └── ...
 ```
+
+### 파일 설명
+- **protocol.fbs**: FlatBuffers 스키마 정의 파일 (수동 편집)
+- **flatc / flatc.exe**: FlatBuffers 컴파일러 실행 파일
+- **Protocol.vcxproj**: Visual Studio 프로젝트 파일 (CustomBuild 규칙 포함)
+- **Protocol.vcxproj.filters**: 솔루션 탐색기 필터 정의
+- **Generated/protocol_generated.h**: 자동 생성된 C++ 헤더 (빌드 시 생성)
+- **protocol_generated.h (메인 프로젝트)**: 빌드 후 자동 복사된 헤더
 
 ## 빌드 순서
 
@@ -133,7 +150,7 @@ ls -la flatc.exe
 cp ../../flatc .
 ```
 
-### 문제 2: "protocol_generated.h가 최신이 아닙니다"
+### 문제 4: "protocol_generated.h가 최신이 아닙니다"
 **증상**: 스키마를 변경했는데 반영이 안 됨
 
 **해결**:
