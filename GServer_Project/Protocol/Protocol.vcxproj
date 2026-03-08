@@ -87,37 +87,29 @@
     <CustomBuild Include="protocol.fbs">
       <FileType>Document</FileType>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">echo Generating FlatBuffers protocol headers...
-$(ProjectDir)flatc.exe --cpp --scoped-enums -o $(ProjectDir)Generated $(ProjectDir)protocol.fbs
-echo Copying generated headers to server project...
-xcopy /Y /Q "$(ProjectDir)Generated\*.h" "$(SolutionDir)GServer_Project\"
-echo Protocol generation complete!
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">echo Generating FlatBuffers protocol headers...
-$(ProjectDir)flatc.exe --cpp --scoped-enums -o $(ProjectDir)Generated $(ProjectDir)protocol.fbs
-echo Copying generated headers to server project...
-xcopy /Y /Q "$(ProjectDir)Generated\*.h" "$(SolutionDir)GServer_Project\"
-echo Protocol generation complete!
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">echo Generating FlatBuffers protocol headers...
-$(ProjectDir)flatc.exe --cpp --scoped-enums -o $(ProjectDir)Generated $(ProjectDir)protocol.fbs
-echo Copying generated headers to server project...
-xcopy /Y /Q "$(ProjectDir)Generated\*.h" "$(SolutionDir)GServer_Project\"
-echo Protocol generation complete!
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
 </Command>
       <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">echo Generating FlatBuffers protocol headers...
-$(ProjectDir)flatc.exe --cpp --scoped-enums -o $(ProjectDir)Generated $(ProjectDir)protocol.fbs
-echo Copying generated headers to server project...
-xcopy /Y /Q "$(ProjectDir)Generated\*.h" "$(SolutionDir)GServer_Project\"
-echo Protocol generation complete!
+"$(ProjectDir)flatc.exe" --cpp --no-warnings -o "$(ProjectDir)" "%(FullPath)"
 </Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Compiling FlatBuffers schema: %(Identity)</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Compiling FlatBuffers schema: %(Identity)</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compiling FlatBuffers schema: %(Identity)</Message>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Compiling FlatBuffers schema: %(Identity)</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)Generated\protocol_generated.h;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)Generated\protocol_generated.h;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)Generated\protocol_generated.h;%(Outputs)</Outputs>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)Generated\protocol_generated.h;%(Outputs)</Outputs>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Generating FlatBuffers header from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Generating FlatBuffers header from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Generating FlatBuffers header from %(Filename).fbs</Message>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Generating FlatBuffers header from %(Filename).fbs</Message>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(ProjectDir)protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(ProjectDir)protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(ProjectDir)protocol_generated.h</Outputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(ProjectDir)protocol_generated.h</Outputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">%(FullPath);$(ProjectDir)flatc.exe</AdditionalInputs>
     </CustomBuild>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
