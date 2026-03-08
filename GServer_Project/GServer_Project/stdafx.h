@@ -14,6 +14,8 @@
 #include <unordered_set>
 #include <concurrent_priority_queue.h>
 
+#include "game_protocol_generated.h"
+
 extern "C" {
 #include "include/lua.h"
 #include "include/lauxlib.h"
