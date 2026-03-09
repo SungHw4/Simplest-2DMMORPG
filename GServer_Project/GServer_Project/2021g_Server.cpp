@@ -601,29 +601,38 @@ void worker()
                       break;
         case OP_NPC_MOVE: {
                 clients[client_id].state_lock.lock();
-                if(clients[client_id].get_state() != ST_INGAME)
-                {
+                if (clients[client_id].get_state() != ST_INGAME) {
                     clients[client_id].state_lock.unlock();
                     clients[client_id].set_active(false);
                     delete exp_over;
                     break;
                 }
                 clients[client_id].state_lock.unlock();
-                if(exp_over->_target == -1)
-                {
+
+                if (exp_over->_target == -1) {
                     delete exp_over;
                     break;
                 }
 
+                // Lua: event_NPC_move(target_id) -> bool
+                // true 반환 시 C++에서 do_npc_move 실행
                 clients[client_id].Lua_Lock.lock();
                 lua_State* L = clients[client_id].L;
-                lua_getglobal(L,"event_NPC_move");
-                int err = lua_pcall(L,1,1,0);
-                if(err != 0) cout << "event_NPC_move ERR" << endl;
-                bool m = lua_toboolean(L,-1);
-                lua_pop(L,2);
+                lua_getglobal(L, "event_NPC_move");   // 함수 push
+                lua_pushnumber(L, exp_over->_target);  // 인자: target player id
+                int err = lua_pcall(L, 1, 1, 0);       // 인자 1개, 반환값 1개
+                if (err != 0) {
+                    cout << "[Lua] event_NPC_move ERR: " << lua_tostring(L, -1) << endl;
+                    lua_pop(L, 1);
+                    clients[client_id].Lua_Lock.unlock();
+                    delete exp_over;
+                    break;
+                }
+                bool should_move = lua_toboolean(L, -1);
+                lua_pop(L, 1);
                 clients[client_id].Lua_Lock.unlock();
-                if(m) do_npc_move(client_id,exp_over->_target);
+
+                if (should_move) do_npc_move(client_id, exp_over->_target);
                 delete exp_over;
                 break;
         }
@@ -726,10 +735,9 @@ void Initialize_NPC()
         lua_pcall(L, 3, 3, 0);
         lua_pop(L, 4);// eliminate set_uid from stack after call
 
-        //lua_register(L, "API_SendMessage", API_SendMessage);
-        //lua_register(L, "API_Touch_Massage", API_Touch_Message);
-        lua_register(L, "API_get_x", API_get_x);
-        lua_register(L, "API_get_y", API_get_y);
+        lua_register(L, "API_get_x",       API_get_x);
+        lua_register(L, "API_get_y",       API_get_y);
+        lua_register(L, "API_SendMessage", API_SendMessage);
     }
 }
 void Initialize_obstacle()
@@ -773,120 +781,81 @@ void npcmove(int npc_id)
 }
 void do_npc_move(int npc_id, int target, std::chrono::seconds time)
 {
-    //int target;
-    unordered_set <int> old_viewlist;
-    unordered_set <int> new_viewlist;
-
+    // -------------------------------------------------------
+    // 1. 이동 전 시야 내 플레이어 목록 수집 (old_viewlist)
+    // -------------------------------------------------------
+    unordered_set<int> old_viewlist;
     for (auto& obj : clients) {
-        if (obj._state != ST_INGAME)
-            continue;
-        if (false == is_player(obj.get_id()))
-            continue;
-        if (true == is_near(npc_id, obj.get_id()))
-            old_viewlist.insert(obj._id);
+        if (obj._state != ST_INGAME)      continue;
+        if (!is_player(obj.get_id()))     continue;
+        if (is_near(npc_id, obj.get_id())) old_viewlist.insert(obj._id);
     }
-    auto& x = clients[npc_id].x;
-    auto& y = clients[npc_id].y;
-    auto& t_x = clients[target].x;
-    auto& t_y = clients[target].y;
-    
+
+    // -------------------------------------------------------
+    // 2. NPC 이동 (타겟 방향으로 1칸)
+    // -------------------------------------------------------
+    auto& x   = clients[npc_id].x;
+    auto& y   = clients[npc_id].y;
+    short t_x = clients[target].x;
+    short t_y = clients[target].y;
+
     if (t_x != x) {
-        if (t_x > x) x++;
-        else x--;
+        x += (t_x > x) ? 1 : -1;
+    } else if (t_y != y) {
+        y += (t_y > y) ? 1 : -1;
     }
-    else if(t_y != y){
-        if (t_y > y) y++;
-        else y--;
-    }
-    clients[npc_id].x = x;
-    clients[npc_id].y = y;
 
-    for(auto& obj : clients)
-    {
-        if(obj.get_state() != ST_INGAME) continue;
-        if (true == is_npc(obj.get_id())) continue;
-        if(true == is_near(npc_id ,obj.get_id()))
-        {
-            new_viewlist.insert(obj.get_id());
-        }
-    }
-    int temp = 0;
-
-    for(auto p1 : new_viewlist)
-    {
-        if( 0 == old_viewlist.count(p1))
-        {
-            clients[p1].vl.lock();
-            clients[p1].viewlist.insert(npc_id);
-            clients[p1].vl.unlock();
-            send_put_object(p1,npc_id);
-            //reinterpret_cast<CLIENT*>(clients[p1])->vl.lock();
-            //reinterpret_cast<CLIENT*>(clients[p1])->viewlist.insert(npc_id);
-            //reinterpret_cast<CLIENT*>(clients[p1])->vl.unlock();
-            //send_put_object(reinterpret_cast<CLIENT*>(clients[p1]), clients[npc_id]);
-        } else
-        {
-            send_move_packet(p1,npc_id);
-        }
-    }
-    
-   /* clients[npc_id].Lua_Lock.lock();
-    lua_State* L = clients[npc_id].L;
-    
-    lua_getglobal(L, "Random_Move");
-    lua_pushnumber(L, x);
-    lua_pushnumber(L, y);
-    int error = lua_pcall(L, 2, 2, 0);
-    if (error != 0) {
-        cout << lua_tostring(L, -1) << endl;
-    }
-    x = lua_tonumber(L, -2);
-    y = lua_tonumber(L, -1);
-    clients[npc_id].Lua_Lock.unlock();*/
-
-   
+    // -------------------------------------------------------
+    // 3. 이동 후 시야 내 플레이어 목록 수집 (new_viewlist)
+    // -------------------------------------------------------
+    unordered_set<int> new_viewlist;
     for (auto& obj : clients) {
-        if (obj._state != ST_INGAME)
-            continue;
-        if (false == is_player(obj.get_id()))
-            continue;
-        if (true == is_near(npc_id, obj.get_id()))
-            new_viewlist.insert(obj.get_id());
+        if (obj._state != ST_INGAME)       continue;
+        if (!is_player(obj.get_id()))      continue;
+        if (is_near(npc_id, obj.get_id())) new_viewlist.insert(obj.get_id());
     }
-    // 새로 시야에 들어온 플레이어
-    int temp_client_id = 0;
+
+    // -------------------------------------------------------
+    // 4. 새로 시야에 들어온 플레이어 → put_object
+    //    계속 시야에 있는 플레이어  → move_packet
+    // -------------------------------------------------------
     for (auto pl : new_viewlist) {
-        if (0 == old_viewlist.count(pl)) {
+        if (old_viewlist.count(pl) == 0) {
+            // 새로 시야에 들어옴
             clients[pl].vl.lock();
             clients[pl].viewlist.insert(npc_id);
             clients[pl].vl.unlock();
             send_put_object(pl, npc_id);
-        }
-        else {
+        } else {
+            // 계속 시야에 있음
             send_move_packet(pl, npc_id);
         }
-        temp_client_id = pl;
     }
-    // 시야에서 사라지는 경우
+
+    // -------------------------------------------------------
+    // 5. 시야에서 사라진 플레이어 → remove_object
+    // -------------------------------------------------------
     for (auto pl : old_viewlist) {
-        if (0 == new_viewlist.count(pl)) {
+        if (new_viewlist.count(pl) == 0) {
             clients[pl].vl.lock();
             clients[pl].viewlist.erase(npc_id);
             clients[pl].vl.unlock();
             send_remove_object(pl, npc_id);
         }
     }
+
+    // -------------------------------------------------------
+    // 6. NPC 상태 확인 후 다음 이동 타이머 등록
+    // -------------------------------------------------------
     clients[npc_id].state_lock.lock();
-    if(clients[npc_id].get_state() != ST_INGAME)
-    {
+    if (clients[npc_id].get_state() != ST_INGAME) {
         clients[npc_id].state_lock.unlock();
         return;
     }
     clients[npc_id].state_lock.unlock();
-    
+
     timer_event ev;
-    ev.obj_id = npc_id;
-    //ev.target_id = temp_client_id;
+    ev.obj_id    = npc_id;
     ev.target_id = target;
     ev.start_time = chrono::system_clock::now() + time;
     ev.ev = EVENT_NPC_MOVE;
