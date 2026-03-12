@@ -57,6 +57,9 @@ struct SCAttackBuilder;
 struct SCObstacle;
 struct SCObstacleBuilder;
 
+struct SCTeleport;
+struct SCTeleportBuilder;
+
 struct CSMessage;
 struct CSMessageBuilder;
 
@@ -113,11 +116,12 @@ enum SCPacketType : int8_t {
   SCPacketType_OBSTACLE = 8,
   SCPacketType_ATTACK = 9,
   SCPacketType_LOGIN_NO = 10,
+  SCPacketType_TELEPORT = 11,
   SCPacketType_MIN = SCPacketType_LOGIN_OK,
-  SCPacketType_MAX = SCPacketType_LOGIN_NO
+  SCPacketType_MAX = SCPacketType_TELEPORT
 };
 
-inline const SCPacketType (&EnumValuesSCPacketType())[10] {
+inline const SCPacketType (&EnumValuesSCPacketType())[11] {
   static const SCPacketType values[] = {
     SCPacketType_LOGIN_OK,
     SCPacketType_MOVE,
@@ -128,13 +132,14 @@ inline const SCPacketType (&EnumValuesSCPacketType())[10] {
     SCPacketType_STATUS_CHANGE,
     SCPacketType_OBSTACLE,
     SCPacketType_ATTACK,
-    SCPacketType_LOGIN_NO
+    SCPacketType_LOGIN_NO,
+    SCPacketType_TELEPORT
   };
   return values;
 }
 
 inline const char * const *EnumNamesSCPacketType() {
-  static const char * const names[11] = {
+  static const char * const names[12] = {
     "LOGIN_OK",
     "MOVE",
     "PUT_OBJECT",
@@ -145,13 +150,14 @@ inline const char * const *EnumNamesSCPacketType() {
     "OBSTACLE",
     "ATTACK",
     "LOGIN_NO",
+    "TELEPORT",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSCPacketType(SCPacketType e) {
-  if (::flatbuffers::IsOutRange(e, SCPacketType_LOGIN_OK, SCPacketType_LOGIN_NO)) return "";
+  if (::flatbuffers::IsOutRange(e, SCPacketType_LOGIN_OK, SCPacketType_TELEPORT)) return "";
   const size_t index = static_cast<size_t>(e) - static_cast<size_t>(SCPacketType_LOGIN_OK);
   return EnumNamesSCPacketType()[index];
 }
@@ -308,11 +314,12 @@ enum SCPacket : uint8_t {
   SCPacket_SCStatusChange = 7,
   SCPacket_SCAttack = 8,
   SCPacket_SCObstacle = 9,
+  SCPacket_SCTeleport = 10,
   SCPacket_MIN = SCPacket_NONE,
-  SCPacket_MAX = SCPacket_SCObstacle
+  SCPacket_MAX = SCPacket_SCTeleport
 };
 
-inline const SCPacket (&EnumValuesSCPacket())[10] {
+inline const SCPacket (&EnumValuesSCPacket())[11] {
   static const SCPacket values[] = {
     SCPacket_NONE,
     SCPacket_SCLoginOk,
@@ -323,13 +330,14 @@ inline const SCPacket (&EnumValuesSCPacket())[10] {
     SCPacket_SCLoginFail,
     SCPacket_SCStatusChange,
     SCPacket_SCAttack,
-    SCPacket_SCObstacle
+    SCPacket_SCObstacle,
+    SCPacket_SCTeleport
   };
   return values;
 }
 
 inline const char * const *EnumNamesSCPacket() {
-  static const char * const names[11] = {
+  static const char * const names[12] = {
     "NONE",
     "SCLoginOk",
     "SCMove",
@@ -340,13 +348,14 @@ inline const char * const *EnumNamesSCPacket() {
     "SCStatusChange",
     "SCAttack",
     "SCObstacle",
+    "SCTeleport",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameSCPacket(SCPacket e) {
-  if (::flatbuffers::IsOutRange(e, SCPacket_NONE, SCPacket_SCObstacle)) return "";
+  if (::flatbuffers::IsOutRange(e, SCPacket_NONE, SCPacket_SCTeleport)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesSCPacket()[index];
 }
@@ -389,6 +398,10 @@ template<> struct SCPacketTraits<GameProtocol::SCAttack> {
 
 template<> struct SCPacketTraits<GameProtocol::SCObstacle> {
   static const SCPacket enum_value = SCPacket_SCObstacle;
+};
+
+template<> struct SCPacketTraits<GameProtocol::SCTeleport> {
+  static const SCPacket enum_value = SCPacket_SCTeleport;
 };
 
 bool VerifySCPacket(::flatbuffers::Verifier &verifier, const void *obj, SCPacket type);
@@ -455,13 +468,13 @@ struct CSMove FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   GameProtocol::Direction direction() const {
     return static_cast<GameProtocol::Direction>(GetField<int8_t>(VT_DIRECTION, 0));
   }
-  int32_t move_time() const {
-    return GetField<int32_t>(VT_MOVE_TIME, 0);
+  uint32_t move_time() const {
+    return GetField<uint32_t>(VT_MOVE_TIME, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int8_t>(verifier, VT_DIRECTION, 1) &&
-           VerifyField<int32_t>(verifier, VT_MOVE_TIME, 4) &&
+           VerifyField<uint32_t>(verifier, VT_MOVE_TIME, 4) &&
            verifier.EndTable();
   }
 };
@@ -473,8 +486,8 @@ struct CSMoveBuilder {
   void add_direction(GameProtocol::Direction direction) {
     fbb_.AddElement<int8_t>(CSMove::VT_DIRECTION, static_cast<int8_t>(direction), 0);
   }
-  void add_move_time(int32_t move_time) {
-    fbb_.AddElement<int32_t>(CSMove::VT_MOVE_TIME, move_time, 0);
+  void add_move_time(uint32_t move_time) {
+    fbb_.AddElement<uint32_t>(CSMove::VT_MOVE_TIME, move_time, 0);
   }
   explicit CSMoveBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -490,7 +503,7 @@ struct CSMoveBuilder {
 inline ::flatbuffers::Offset<CSMove> CreateCSMove(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     GameProtocol::Direction direction = GameProtocol::Direction_UP,
-    int32_t move_time = 0) {
+    uint32_t move_time = 0) {
   CSMoveBuilder builder_(_fbb);
   builder_.add_move_time(move_time);
   builder_.add_direction(direction);
@@ -592,8 +605,20 @@ inline ::flatbuffers::Offset<CSChat> CreateCSChatDirect(
 
 struct CSTeleport FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef CSTeleportBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_TARGET_X = 4,
+    VT_TARGET_Y = 6
+  };
+  int16_t target_x() const {
+    return GetField<int16_t>(VT_TARGET_X, 0);
+  }
+  int16_t target_y() const {
+    return GetField<int16_t>(VT_TARGET_Y, 0);
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyField<int16_t>(verifier, VT_TARGET_X, 2) &&
+           VerifyField<int16_t>(verifier, VT_TARGET_Y, 2) &&
            verifier.EndTable();
   }
 };
@@ -602,6 +627,12 @@ struct CSTeleportBuilder {
   typedef CSTeleport Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
+  void add_target_x(int16_t target_x) {
+    fbb_.AddElement<int16_t>(CSTeleport::VT_TARGET_X, target_x, 0);
+  }
+  void add_target_y(int16_t target_y) {
+    fbb_.AddElement<int16_t>(CSTeleport::VT_TARGET_Y, target_y, 0);
+  }
   explicit CSTeleportBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -614,8 +645,12 @@ struct CSTeleportBuilder {
 };
 
 inline ::flatbuffers::Offset<CSTeleport> CreateCSTeleport(
-    ::flatbuffers::FlatBufferBuilder &_fbb) {
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    int16_t target_x = 0,
+    int16_t target_y = 0) {
   CSTeleportBuilder builder_(_fbb);
+  builder_.add_target_y(target_y);
+  builder_.add_target_x(target_x);
   return builder_.Finish();
 }
 
@@ -732,8 +767,8 @@ struct SCMove FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int32_t id() const {
     return GetField<int32_t>(VT_ID, 0);
   }
-  int32_t hp() const {
-    return GetField<int32_t>(VT_HP, 0);
+  int16_t hp() const {
+    return GetField<int16_t>(VT_HP, 0);
   }
   int16_t x() const {
     return GetField<int16_t>(VT_X, 0);
@@ -741,16 +776,16 @@ struct SCMove FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int16_t y() const {
     return GetField<int16_t>(VT_Y, 0);
   }
-  int32_t move_time() const {
-    return GetField<int32_t>(VT_MOVE_TIME, 0);
+  uint32_t move_time() const {
+    return GetField<uint32_t>(VT_MOVE_TIME, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int32_t>(verifier, VT_ID, 4) &&
-           VerifyField<int32_t>(verifier, VT_HP, 4) &&
+           VerifyField<int16_t>(verifier, VT_HP, 2) &&
            VerifyField<int16_t>(verifier, VT_X, 2) &&
            VerifyField<int16_t>(verifier, VT_Y, 2) &&
-           VerifyField<int32_t>(verifier, VT_MOVE_TIME, 4) &&
+           VerifyField<uint32_t>(verifier, VT_MOVE_TIME, 4) &&
            verifier.EndTable();
   }
 };
@@ -762,8 +797,8 @@ struct SCMoveBuilder {
   void add_id(int32_t id) {
     fbb_.AddElement<int32_t>(SCMove::VT_ID, id, 0);
   }
-  void add_hp(int32_t hp) {
-    fbb_.AddElement<int32_t>(SCMove::VT_HP, hp, 0);
+  void add_hp(int16_t hp) {
+    fbb_.AddElement<int16_t>(SCMove::VT_HP, hp, 0);
   }
   void add_x(int16_t x) {
     fbb_.AddElement<int16_t>(SCMove::VT_X, x, 0);
@@ -771,8 +806,8 @@ struct SCMoveBuilder {
   void add_y(int16_t y) {
     fbb_.AddElement<int16_t>(SCMove::VT_Y, y, 0);
   }
-  void add_move_time(int32_t move_time) {
-    fbb_.AddElement<int32_t>(SCMove::VT_MOVE_TIME, move_time, 0);
+  void add_move_time(uint32_t move_time) {
+    fbb_.AddElement<uint32_t>(SCMove::VT_MOVE_TIME, move_time, 0);
   }
   explicit SCMoveBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -788,16 +823,16 @@ struct SCMoveBuilder {
 inline ::flatbuffers::Offset<SCMove> CreateSCMove(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     int32_t id = 0,
-    int32_t hp = 0,
+    int16_t hp = 0,
     int16_t x = 0,
     int16_t y = 0,
-    int32_t move_time = 0) {
+    uint32_t move_time = 0) {
   SCMoveBuilder builder_(_fbb);
   builder_.add_move_time(move_time);
-  builder_.add_hp(hp);
   builder_.add_id(id);
   builder_.add_y(y);
   builder_.add_x(x);
+  builder_.add_hp(hp);
   return builder_.Finish();
 }
 
@@ -820,8 +855,8 @@ struct SCPutObject FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int16_t y() const {
     return GetField<int16_t>(VT_Y, 0);
   }
-  int32_t hp() const {
-    return GetField<int32_t>(VT_HP, 0);
+  int16_t hp() const {
+    return GetField<int16_t>(VT_HP, 0);
   }
   GameProtocol::ObjectType object_type() const {
     return static_cast<GameProtocol::ObjectType>(GetField<int8_t>(VT_OBJECT_TYPE, 0));
@@ -834,7 +869,7 @@ struct SCPutObject FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
            VerifyField<int32_t>(verifier, VT_ID, 4) &&
            VerifyField<int16_t>(verifier, VT_X, 2) &&
            VerifyField<int16_t>(verifier, VT_Y, 2) &&
-           VerifyField<int32_t>(verifier, VT_HP, 4) &&
+           VerifyField<int16_t>(verifier, VT_HP, 2) &&
            VerifyField<int8_t>(verifier, VT_OBJECT_TYPE, 1) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
@@ -855,8 +890,8 @@ struct SCPutObjectBuilder {
   void add_y(int16_t y) {
     fbb_.AddElement<int16_t>(SCPutObject::VT_Y, y, 0);
   }
-  void add_hp(int32_t hp) {
-    fbb_.AddElement<int32_t>(SCPutObject::VT_HP, hp, 0);
+  void add_hp(int16_t hp) {
+    fbb_.AddElement<int16_t>(SCPutObject::VT_HP, hp, 0);
   }
   void add_object_type(GameProtocol::ObjectType object_type) {
     fbb_.AddElement<int8_t>(SCPutObject::VT_OBJECT_TYPE, static_cast<int8_t>(object_type), 0);
@@ -880,13 +915,13 @@ inline ::flatbuffers::Offset<SCPutObject> CreateSCPutObject(
     int32_t id = 0,
     int16_t x = 0,
     int16_t y = 0,
-    int32_t hp = 0,
+    int16_t hp = 0,
     GameProtocol::ObjectType object_type = GameProtocol::ObjectType_NONE,
     ::flatbuffers::Offset<::flatbuffers::String> name = 0) {
   SCPutObjectBuilder builder_(_fbb);
   builder_.add_name(name);
-  builder_.add_hp(hp);
   builder_.add_id(id);
+  builder_.add_hp(hp);
   builder_.add_y(y);
   builder_.add_x(x);
   builder_.add_object_type(object_type);
@@ -898,7 +933,7 @@ inline ::flatbuffers::Offset<SCPutObject> CreateSCPutObjectDirect(
     int32_t id = 0,
     int16_t x = 0,
     int16_t y = 0,
-    int32_t hp = 0,
+    int16_t hp = 0,
     GameProtocol::ObjectType object_type = GameProtocol::ObjectType_NONE,
     const char *name = nullptr) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
@@ -1022,12 +1057,13 @@ struct SCLoginFail FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_REASON = 4
   };
-  int32_t reason() const {
-    return GetField<int32_t>(VT_REASON, 0);
+  const ::flatbuffers::String *reason() const {
+    return GetPointer<const ::flatbuffers::String *>(VT_REASON);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyField<int32_t>(verifier, VT_REASON, 4) &&
+           VerifyOffset(verifier, VT_REASON) &&
+           verifier.VerifyString(reason()) &&
            verifier.EndTable();
   }
 };
@@ -1036,8 +1072,8 @@ struct SCLoginFailBuilder {
   typedef SCLoginFail Table;
   ::flatbuffers::FlatBufferBuilder &fbb_;
   ::flatbuffers::uoffset_t start_;
-  void add_reason(int32_t reason) {
-    fbb_.AddElement<int32_t>(SCLoginFail::VT_REASON, reason, 0);
+  void add_reason(::flatbuffers::Offset<::flatbuffers::String> reason) {
+    fbb_.AddOffset(SCLoginFail::VT_REASON, reason);
   }
   explicit SCLoginFailBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1052,10 +1088,19 @@ struct SCLoginFailBuilder {
 
 inline ::flatbuffers::Offset<SCLoginFail> CreateSCLoginFail(
     ::flatbuffers::FlatBufferBuilder &_fbb,
-    int32_t reason = 0) {
+    ::flatbuffers::Offset<::flatbuffers::String> reason = 0) {
   SCLoginFailBuilder builder_(_fbb);
   builder_.add_reason(reason);
   return builder_.Finish();
+}
+
+inline ::flatbuffers::Offset<SCLoginFail> CreateSCLoginFailDirect(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    const char *reason = nullptr) {
+  auto reason__ = reason ? _fbb.CreateString(reason) : 0;
+  return GameProtocol::CreateSCLoginFail(
+      _fbb,
+      reason__);
 }
 
 struct SCStatusChange FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
@@ -1220,17 +1265,17 @@ struct SCObstacle FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   int32_t id() const {
     return GetField<int32_t>(VT_ID, 0);
   }
-  int32_t x() const {
-    return GetField<int32_t>(VT_X, 0);
+  int16_t x() const {
+    return GetField<int16_t>(VT_X, 0);
   }
-  int32_t y() const {
-    return GetField<int32_t>(VT_Y, 0);
+  int16_t y() const {
+    return GetField<int16_t>(VT_Y, 0);
   }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<int32_t>(verifier, VT_ID, 4) &&
-           VerifyField<int32_t>(verifier, VT_X, 4) &&
-           VerifyField<int32_t>(verifier, VT_Y, 4) &&
+           VerifyField<int16_t>(verifier, VT_X, 2) &&
+           VerifyField<int16_t>(verifier, VT_Y, 2) &&
            verifier.EndTable();
   }
 };
@@ -1242,11 +1287,11 @@ struct SCObstacleBuilder {
   void add_id(int32_t id) {
     fbb_.AddElement<int32_t>(SCObstacle::VT_ID, id, 0);
   }
-  void add_x(int32_t x) {
-    fbb_.AddElement<int32_t>(SCObstacle::VT_X, x, 0);
+  void add_x(int16_t x) {
+    fbb_.AddElement<int16_t>(SCObstacle::VT_X, x, 0);
   }
-  void add_y(int32_t y) {
-    fbb_.AddElement<int32_t>(SCObstacle::VT_Y, y, 0);
+  void add_y(int16_t y) {
+    fbb_.AddElement<int16_t>(SCObstacle::VT_Y, y, 0);
   }
   explicit SCObstacleBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -1262,12 +1307,73 @@ struct SCObstacleBuilder {
 inline ::flatbuffers::Offset<SCObstacle> CreateSCObstacle(
     ::flatbuffers::FlatBufferBuilder &_fbb,
     int32_t id = 0,
-    int32_t x = 0,
-    int32_t y = 0) {
+    int16_t x = 0,
+    int16_t y = 0) {
   SCObstacleBuilder builder_(_fbb);
+  builder_.add_id(id);
   builder_.add_y(y);
   builder_.add_x(x);
+  return builder_.Finish();
+}
+
+struct SCTeleport FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SCTeleportBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_ID = 4,
+    VT_X = 6,
+    VT_Y = 8
+  };
+  int32_t id() const {
+    return GetField<int32_t>(VT_ID, 0);
+  }
+  int16_t x() const {
+    return GetField<int16_t>(VT_X, 0);
+  }
+  int16_t y() const {
+    return GetField<int16_t>(VT_Y, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, VT_ID, 4) &&
+           VerifyField<int16_t>(verifier, VT_X, 2) &&
+           VerifyField<int16_t>(verifier, VT_Y, 2) &&
+           verifier.EndTable();
+  }
+};
+
+struct SCTeleportBuilder {
+  typedef SCTeleport Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_id(int32_t id) {
+    fbb_.AddElement<int32_t>(SCTeleport::VT_ID, id, 0);
+  }
+  void add_x(int16_t x) {
+    fbb_.AddElement<int16_t>(SCTeleport::VT_X, x, 0);
+  }
+  void add_y(int16_t y) {
+    fbb_.AddElement<int16_t>(SCTeleport::VT_Y, y, 0);
+  }
+  explicit SCTeleportBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SCTeleport> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SCTeleport>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SCTeleport> CreateSCTeleport(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t id = 0,
+    int16_t x = 0,
+    int16_t y = 0) {
+  SCTeleportBuilder builder_(_fbb);
   builder_.add_id(id);
+  builder_.add_y(y);
+  builder_.add_x(x);
   return builder_.Finish();
 }
 
@@ -1399,6 +1505,9 @@ struct SCMessage FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   const GameProtocol::SCObstacle *packet_as_SCObstacle() const {
     return packet_type() == GameProtocol::SCPacket_SCObstacle ? static_cast<const GameProtocol::SCObstacle *>(packet()) : nullptr;
   }
+  const GameProtocol::SCTeleport *packet_as_SCTeleport() const {
+    return packet_type() == GameProtocol::SCPacket_SCTeleport ? static_cast<const GameProtocol::SCTeleport *>(packet()) : nullptr;
+  }
   bool Verify(::flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_PACKET_TYPE, 1) &&
@@ -1442,6 +1551,10 @@ template<> inline const GameProtocol::SCAttack *SCMessage::packet_as<GameProtoco
 
 template<> inline const GameProtocol::SCObstacle *SCMessage::packet_as<GameProtocol::SCObstacle>() const {
   return packet_as_SCObstacle();
+}
+
+template<> inline const GameProtocol::SCTeleport *SCMessage::packet_as<GameProtocol::SCTeleport>() const {
+  return packet_as_SCTeleport();
 }
 
 struct SCMessageBuilder {
@@ -1555,6 +1668,10 @@ inline bool VerifySCPacket(::flatbuffers::Verifier &verifier, const void *obj, S
     }
     case SCPacket_SCObstacle: {
       auto ptr = reinterpret_cast<const GameProtocol::SCObstacle *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case SCPacket_SCTeleport: {
+      auto ptr = reinterpret_cast<const GameProtocol::SCTeleport *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

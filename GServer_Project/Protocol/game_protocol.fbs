@@ -22,7 +22,8 @@ enum SCPacketType : byte {
   STATUS_CHANGE = 7,
   OBSTACLE = 8,
   ATTACK = 9,
-  LOGIN_NO = 10
+  LOGIN_NO = 10,
+  TELEPORT = 11
 }
 
 enum Direction : byte {
@@ -46,7 +47,7 @@ table CSLogin {
 
 table CSMove {
   direction: Direction;
-  move_time: int;
+  move_time: uint;
 }
 
 table CSAttack {
@@ -58,7 +59,8 @@ table CSChat {
 }
 
 table CSTeleport {
-  // Reserved for future use
+  target_x: short = 0;
+  target_y: short = 0;
 }
 
 // Server to Client Messages
@@ -74,17 +76,17 @@ table SCLoginOk {
 
 table SCMove {
   id: int;
-  hp: int;
+  hp: short;
   x: short;
   y: short;
-  move_time: int;
+  move_time: uint;
 }
 
 table SCPutObject {
   id: int;
   x: short;
   y: short;
-  hp: int;
+  hp: short;
   object_type: ObjectType;
   name: string;
 }
@@ -99,7 +101,7 @@ table SCChat {
 }
 
 table SCLoginFail {
-  reason: int; // 0: duplicate ID, 1: server full
+  reason: string;
 }
 
 table SCStatusChange {
@@ -119,8 +121,14 @@ table SCAttack {
 
 table SCObstacle {
   id: int;
-  x: int;
-  y: int;
+  x: short;
+  y: short;
+}
+
+table SCTeleport {
+  id: int;
+  x: short;
+  y: short;
 }
 
 // Union for Client packets
@@ -142,7 +150,8 @@ union SCPacket {
   SCLoginFail,
   SCStatusChange,
   SCAttack,
-  SCObstacle
+  SCObstacle,
+  SCTeleport
 }
 
 // Root message wrapper for Client

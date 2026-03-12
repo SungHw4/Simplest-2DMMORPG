@@ -9,9 +9,6 @@ mutex LuaLock;
 
 BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 
-//BOOL LoadDB(string t);
-//void UpdatePlayerOnDB(int c_id);
-
 extern SQLINTEGER p_id;
 extern SQLINTEGER p_x;
 extern SQLINTEGER p_y;
@@ -22,16 +19,12 @@ extern SQLINTEGER p_lv;
 
 concurrency::concurrent_priority_queue <timer_event> timer_queue;
 
-//void error_display(int err_no);
-//void do_npc_move(int npc_id);
-void do_npc_move(int npc_id, int target ,std::chrono::seconds time = 1s);
+void do_npc_move(int npc_id, int target, std::chrono::seconds time = 1s);
 void npcmove(int npc_id);
-
-
 
 array <CLIENT, MAX_USER + MAX_NPC> clients;
 
-// Helper function to lock two viewlists in a consistent order to prevent deadlock
+// Helper: 두 viewlist를 일관된 순서로 잠그기 (데드락 방지)
 void lock_two_viewlists(int id1, int id2, std::function<void()> callback)
 {
     if (id1 == id2) {
@@ -56,21 +49,12 @@ bool is_near(int a, int b)
 }
 bool is_near_ob(int a, int b)
 {
-    //if (RANGE < abs(obstacle[a].x - clients[b].x)) return false;
-    //if (RANGE < abs(obstacle[a].y - clients[b].y)) return false;
     return true;
 }
 bool is_attack_range(int a, int b)
 {
     if (2 < abs(clients[a].x - clients[b].x)) return false;
     if (2 < abs(clients[a].y - clients[b].y)) return false;
-    return true;
-}
-
-bool is_attacth(int a, int b)
-{
-    if (3 < abs(clients[a].x - clients[b].x)) return false;
-    if (3 < abs(clients[a].y - clients[b].y)) return false;
     return true;
 }
 
@@ -86,7 +70,6 @@ bool is_player(int id)
 
 int get_new_id()
 {
-    static int g_id = 0;
     static mutex id_allocation_mutex;
     lock_guard<mutex> lock(id_allocation_mutex);
 
@@ -100,110 +83,93 @@ int get_new_id()
     return -1;
 }
 
+// -----------------------------------------------------------------------
+// Helper: FlatBuffers 버퍼를 CLIENT에게 전송
+//   framed = [4바이트 크기][FlatBuffers 데이터]
+// -----------------------------------------------------------------------
+void send_fb_packet(int c_id, std::vector<uint8_t>& framed)
+{
+    clients[c_id].do_send(static_cast<int>(framed.size()), framed.data());
+}
+
+// -----------------------------------------------------------------------
+// SC → Client 패킷 전송 함수 (FlatBuffers 기반)
+// -----------------------------------------------------------------------
+
 void send_login_ok_packet(int c_id)
 {
-    sc_packet_login_ok packet;
-    packet.id = c_id;
-    packet.type = SC_PACKET_LOGIN_OK;
-    packet.size = sizeof(packet);
-    packet.x = clients[c_id].x;
-    packet.y = clients[c_id].y;
-    packet.exp = clients[c_id].exp;
-    packet.hp = clients[c_id].hp;
-    packet.maxhp = clients[c_id].maxhp;
-    packet.level = clients[c_id].level;
-    //memcpy(packet.obs, obs, sizeof(packet.obs));
-    //packet.type = clients[c_id]._type;
-    clients[c_id].do_send(sizeof(packet), &packet);
+    auto framed = FBProtocol::BuildLoginOk(
+        c_id,
+        clients[c_id].x, clients[c_id].y,
+        clients[c_id].level,
+        clients[c_id].hp, clients[c_id].maxhp,
+        clients[c_id].exp);
+    send_fb_packet(c_id, framed);
 }
 
 void send_login_no_packet(int c_id)
 {
-
-    sc_packet_login_ok packet;
-    packet.id = c_id;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_LOGIN_FAIL;
-    packet.x = clients[c_id].x;
-    packet.y = clients[c_id].y;
-    clients[c_id].do_send(sizeof(packet), &packet);
-}
-
-void send_attack_packet(int c_id)
-{
-    clients[c_id].hp -= 10;
-    sc_packet_attack packet;
-    packet.hp = clients[c_id].hp;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_ATTACK;
-    packet.x = clients[c_id].x;
-    packet.y = clients[c_id].y;
-    clients[c_id].do_send(sizeof(packet), &packet);
-    //clients[c_id].viewlist;
+    auto framed = FBProtocol::BuildLoginFail("Login failed");
+    send_fb_packet(c_id, framed);
 }
 
 void send_move_packet(int c_id, int mover)
 {
-    sc_packet_move packet;
-    packet.id = mover;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_MOVE;
-    packet.x = clients[mover].x;
-    packet.y = clients[mover].y;
-    packet.hp = clients[mover].hp;
-    packet.move_time = clients[mover].last_move_time;
-    clients[c_id].do_send(sizeof(packet), &packet);
+    auto framed = FBProtocol::BuildMove(
+        mover,
+        clients[mover].hp,
+        clients[mover].x, clients[mover].y,
+        static_cast<uint32_t>(clients[mover].last_move_time));
+    send_fb_packet(c_id, framed);
 }
 
 void send_remove_object(int c_id, int victim)
 {
-    sc_packet_remove_object packet;
-    packet.id = victim;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_REMOVE_OBJECT;
-    clients[c_id].do_send(sizeof(packet), &packet);
+    auto framed = FBProtocol::BuildRemoveObject(victim);
+    send_fb_packet(c_id, framed);
 }
 
 void send_put_object(int c_id, int target)
-{  
-    sc_packet_put_object packet;
-    packet.id = target;
-    cout << clients[target].hp << endl;
-    packet.hp = clients[target].hp;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_PUT_OBJECT;
-    packet.x = clients[target].x;
-    packet.y = clients[target].y;
-    strcpy_s(packet.name, clients[target].name);
-    packet.object_type = 0;
-    clients[c_id].do_send(sizeof(packet), &packet);
-}
-void send_obstacle_object(int id, int target_id)
 {
-    sc_packet_obstacle packet;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_OBSTACLE;
-    packet.id = target_id;
-   // packet.x = obstacle[id].x;
-   // packet.y = obstacle[id].y;
-  //  obstacle[id].do_send(sizeof(packet), &packet);
-   
+    GameProtocol::ObjectType obj_type =
+        static_cast<GameProtocol::ObjectType>(clients[target]._type);
+    auto framed = FBProtocol::BuildPutObject(
+        target,
+        clients[target].x, clients[target].y,
+        clients[target].hp,
+        obj_type,
+        clients[target].name);
+    send_fb_packet(c_id, framed);
 }
 
-void send_chat_packet(int user_id, int my_id, char* mess)
+void send_chat_packet(int user_id, int my_id, const char* mess)
 {
-    sc_packet_chat packet;
-    packet.id = my_id;
-    packet.size = sizeof(packet);
-    packet.type = SC_PACKET_CHAT;
-    strcpy_s(packet.message, mess);
-    clients[user_id].do_send(sizeof(packet), &packet);
+    auto framed = FBProtocol::BuildChat(my_id, mess);
+    send_fb_packet(user_id, framed);
 }
 
+void send_attack_packet(int c_id, int attacker_id)
+{
+    auto framed = FBProtocol::BuildAttack(
+        attacker_id,
+        clients[attacker_id].x, clients[attacker_id].y,
+        clients[attacker_id].hp,
+        clients[attacker_id].exp);
+    send_fb_packet(c_id, framed);
+}
+
+void send_teleport_packet(int c_id)
+{
+    auto framed = FBProtocol::BuildTeleport(c_id, clients[c_id].x, clients[c_id].y);
+    send_fb_packet(c_id, framed);
+}
+
+// -----------------------------------------------------------------------
+// Disconnect
+// -----------------------------------------------------------------------
 void Disconnect(int c_id)
 {
     CLIENT& cl = clients[c_id];
-    //UpdatePlayerOnDB(c_id);
     UpdatePlayerOnDB(c_id, clients[c_id]);
     cl.vl.lock();
     unordered_set <int> my_vl = cl.viewlist;
@@ -211,8 +177,7 @@ void Disconnect(int c_id)
     for (auto& other : my_vl) {
         CLIENT& target = clients[other];
         if (true == is_npc(target._id)) continue;
-        if (ST_INGAME != target._state)
-            continue;
+        if (ST_INGAME != target._state) continue;
         target.vl.lock();
         if (0 != target.viewlist.count(c_id)) {
             target.viewlist.erase(c_id);
@@ -241,22 +206,31 @@ void Activate_NPC_Move_Event(int target, int player_id)
     exp_over->_target = player_id;
     PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
 }
+
 // -----------------------------------------------------------------------
-// 패킷 타입별 핸들러 함수
+// CS → Server 패킷 핸들러 함수 (FlatBuffers 기반)
 // -----------------------------------------------------------------------
 
-void handle_login(int client_id, unsigned char* p)
+// CS_PACKET_LOGIN (type=1)
+void handle_login(int client_id, const uint8_t* fb_buf, uint32_t fb_size)
 {
+    const GameProtocol::CSMessage* msg = FBProtocol::ParseCSMessage(fb_buf, fb_size);
+    if (!msg || msg->packet_type() != GameProtocol::CSPacket_CSLogin) {
+        cout << "[handle_login] Invalid FlatBuffers packet from client " << client_id << endl;
+        return;
+    }
+    const GameProtocol::CSLogin* login = msg->packet_as_CSLogin();
+    if (!login || !login->name()) return;
+
     CLIENT& cl = clients[client_id];
-    cs_packet_login* packet = reinterpret_cast<cs_packet_login*>(p);
-    strcpy_s(cl.name, packet->name);
+    strncpy_s(cl.name, login->name()->c_str(), MAX_NAME_SIZE - 1);
 
     if (Load_DB(cl.name)) {
-        cl.x     = p_x;
-        cl.y     = p_y;
-        cl.level = p_lv;
-        cl.maxhp = p_maxhp;
-        cl.hp    = p_hp;
+        cl.x     = static_cast<short>(p_x);
+        cl.y     = static_cast<short>(p_y);
+        cl.level = static_cast<short>(p_lv);
+        cl.maxhp = static_cast<short>(p_maxhp);
+        cl.hp    = static_cast<short>(p_hp);
         cl.exp   = p_exp;
         cl.dmg   = 10 + (p_lv * 3);
         send_login_ok_packet(client_id);
@@ -274,14 +248,10 @@ void handle_login(int client_id, unsigned char* p)
         if (other._id == client_id) continue;
 
         other.state_lock.lock();
-        if (ST_INGAME != other._state) {
-            other.state_lock.unlock();
-            continue;
-        }
+        if (ST_INGAME != other._state) { other.state_lock.unlock(); continue; }
         other.state_lock.unlock();
 
-        if (false == is_near(other._id, client_id))
-            continue;
+        if (false == is_near(other._id, client_id)) continue;
 
         if (true == is_npc(other._id)) {
             timer_event ev;
@@ -296,17 +266,7 @@ void handle_login(int client_id, unsigned char* p)
         other.vl.lock();
         other.viewlist.insert(client_id);
         other.vl.unlock();
-
-        sc_packet_put_object pkt;
-        pkt.id          = client_id;
-        strcpy_s(pkt.name, cl.name);
-        pkt.object_type = cl._type;
-        pkt.size        = sizeof(pkt);
-        pkt.type        = SC_PACKET_PUT_OBJECT;
-        pkt.x           = cl.x;
-        pkt.hp          = cl.hp;
-        pkt.y           = cl.y;
-        other.do_send(sizeof(pkt), &pkt);
+        send_put_object(other._id, client_id);
     }
 
     // 새로 접속한 플레이어에게 주변 오브젝트 정보 전송
@@ -314,101 +274,79 @@ void handle_login(int client_id, unsigned char* p)
         if (other._id == client_id) continue;
 
         other.state_lock.lock();
-        if (ST_INGAME != other._state) {
-            other.state_lock.unlock();
-            continue;
-        }
+        if (ST_INGAME != other._state) { other.state_lock.unlock(); continue; }
         other.state_lock.unlock();
 
-        if (false == is_near(other._id, client_id))
-            continue;
+        if (false == is_near(other._id, client_id)) continue;
 
         clients[client_id].vl.lock();
         clients[client_id].viewlist.insert(other._id);
         clients[client_id].vl.unlock();
-
-        sc_packet_put_object pkt;
-        pkt.id          = other._id;
-        strcpy_s(pkt.name, other.name);
-        pkt.object_type = other._type;
-        pkt.size        = sizeof(pkt);
-        pkt.type        = SC_PACKET_PUT_OBJECT;
-        pkt.x           = other.x;
-        pkt.hp          = other.hp;
-        pkt.y           = other.y;
-        cl.do_send(sizeof(pkt), &pkt);
+        send_put_object(client_id, other._id);
     }
 }
 
-void handle_attack(int client_id, unsigned char* p)
+// CS_PACKET_ATTACK (type=3)
+void handle_attack(int client_id, const uint8_t* fb_buf, uint32_t fb_size)
 {
-    CLIENT& cl = clients[client_id];
-    cout << "1" << endl;
+    const GameProtocol::CSMessage* msg = FBProtocol::ParseCSMessage(fb_buf, fb_size);
+    if (!msg || msg->packet_type() != GameProtocol::CSPacket_CSAttack) {
+        cout << "[handle_attack] Invalid FlatBuffers packet from client " << client_id << endl;
+        return;
+    }
+    // target_id는 클라이언트가 지정하지만 서버는 viewlist에서 범위 내 적을 공격
+    // const GameProtocol::CSAttack* attack = msg->packet_as_CSAttack();
 
+    CLIENT& cl = clients[client_id];
     cl.vl.lock();
     unordered_set<int> my_vl{ cl.viewlist };
     cl.vl.unlock();
 
-    for (auto& k : my_vl)
-        cout << k << endl;
-
     for (auto& k : my_vl) {
         if (is_attack_range(client_id, k)) {
-            cout << "123" << endl;
-            sc_packet_attack* pkt = reinterpret_cast<sc_packet_attack*>(p);
             clients[client_id].hp -= clients[k].dmg;
             clients[k].hp         -= clients[client_id].dmg;
-            pkt->id   = k;
-            pkt->size = sizeof(pkt);
-            pkt->hp   = clients[k].hp;
-            pkt->x    = clients[k].x;
-            pkt->y    = clients[k].y;
-            pkt->exp  = clients[k].y;
-            pkt->type = SC_PACKET_ATTACK;
-            clients[client_id].do_send(sizeof(pkt), &pkt);
+            // 피격 대상(k)에게 공격 결과 전송
+            send_attack_packet(client_id, k);
         }
     }
-
-    sc_packet_attack* pkt = reinterpret_cast<sc_packet_attack*>(p);
-    cout << clients[client_id].hp << endl;
-    pkt->id   = client_id;
-    pkt->size = sizeof(pkt);
-    pkt->hp   = clients[client_id].hp;
-    pkt->x    = clients[client_id].x;
-    pkt->y    = clients[client_id].y;
-    pkt->exp  = clients[client_id].y;
-    pkt->type = SC_PACKET_ATTACK;
-    clients[client_id].do_send(sizeof(pkt), &pkt);
+    // 자기 자신 HP 업데이트 전송
+    send_attack_packet(client_id, client_id);
 }
 
-void handle_move(int client_id, unsigned char* p)
+// CS_PACKET_MOVE (type=2)
+void handle_move(int client_id, const uint8_t* fb_buf, uint32_t fb_size)
 {
+    const GameProtocol::CSMessage* msg = FBProtocol::ParseCSMessage(fb_buf, fb_size);
+    if (!msg || msg->packet_type() != GameProtocol::CSPacket_CSMove) {
+        cout << "[handle_move] Invalid FlatBuffers packet from client " << client_id << endl;
+        return;
+    }
+    const GameProtocol::CSMove* move = msg->packet_as_CSMove();
+    if (!move) return;
+
     CLIENT& cl = clients[client_id];
-    cs_packet_move* packet = reinterpret_cast<cs_packet_move*>(p);
-    cl.last_move_time = packet->move_time;
+    cl.last_move_time = static_cast<int>(move->move_time());
 
     int x = cl.x;
     int y = cl.y;
-    switch (packet->direction) {
+    switch (static_cast<int>(move->direction())) {
     case 0: if (y > 0 && obs[y-1][x] == 0) y--; break;
     case 1: if (y < (WORLD_HEIGHT - 1) && obs[y+1][x] == 0) y++; break;
     case 2: if (x > 0 && obs[y][x-1] == 0) x--; break;
     case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;
     default:
-        cout << "Invalid move in client " << client_id << endl;
-        exit(-1);
+        cout << "Invalid move direction from client " << client_id << endl;
+        return;
     }
-    cl.x = x;
-    cl.y = y;
+    cl.x = static_cast<short>(x);
+    cl.y = static_cast<short>(y);
 
     unordered_set<int> nearlist;
     for (auto& other : clients) {
-        if (other._id == client_id)
-            continue;
-        if (ST_INGAME != other.get_state())
-            continue;
-        if (false == is_near(client_id, other.get_id()))
-            continue;
+        if (other._id == client_id) continue;
+        if (ST_INGAME != other.get_state()) continue;
+        if (false == is_near(client_id, other.get_id())) continue;
         if (true == is_npc(other.get_id())) {
             if (other._is_active == false) {
                 other.set_active(true);
@@ -452,22 +390,17 @@ void handle_move(int client_id, unsigned char* p)
                 clients[other].viewlist.insert(cl._id);
                 clients[other].vl.unlock();
                 send_put_object(other, cl._id);
-            }
-            else {
+            } else {
                 clients[other].vl.unlock();
                 send_move_packet(other, cl._id);
             }
-        }
-        // 계속 시야에 있는 오브젝트 처리
-        else {
+        } else {
             if (true == is_npc(other)) continue;
-
             clients[other].vl.lock();
             if (0 != clients[other].viewlist.count(cl._id)) {
                 clients[other].vl.unlock();
                 send_move_packet(other, cl._id);
-            }
-            else {
+            } else {
                 clients[other].viewlist.insert(cl._id);
                 clients[other].vl.unlock();
                 send_put_object(other, cl._id);
@@ -490,31 +423,148 @@ void handle_move(int client_id, unsigned char* p)
                 clients[other].viewlist.erase(cl._id);
                 clients[other].vl.unlock();
                 send_remove_object(other, cl._id);
-            }
-            else clients[other].vl.unlock();
+            } else clients[other].vl.unlock();
+        }
+    }
+}
+
+// CS_PACKET_CHAT (type=4)
+void handle_chat(int client_id, const uint8_t* fb_buf, uint32_t fb_size)
+{
+    const GameProtocol::CSMessage* msg = FBProtocol::ParseCSMessage(fb_buf, fb_size);
+    if (!msg || msg->packet_type() != GameProtocol::CSPacket_CSChat) {
+        cout << "[handle_chat] Invalid FlatBuffers packet from client " << client_id << endl;
+        return;
+    }
+    const GameProtocol::CSChat* chat = msg->packet_as_CSChat();
+    if (!chat || !chat->message()) return;
+
+    CLIENT& cl = clients[client_id];
+    cl.vl.lock();
+    unordered_set<int> my_vl{ cl.viewlist };
+    cl.vl.unlock();
+
+    const char* message = chat->message()->c_str();
+    // 자신에게도 전송
+    send_chat_packet(client_id, client_id, message);
+    // 시야 내 플레이어들에게 전송
+    for (auto other : my_vl) {
+        if (is_player(other)) {
+            send_chat_packet(other, client_id, message);
+        }
+    }
+}
+
+// CS_PACKET_TELEPORT (type=5)
+void handle_teleport(int client_id, const uint8_t* fb_buf, uint32_t fb_size)
+{
+    const GameProtocol::CSMessage* msg = FBProtocol::ParseCSMessage(fb_buf, fb_size);
+    if (!msg || msg->packet_type() != GameProtocol::CSPacket_CSTeleport) {
+        cout << "[handle_teleport] Invalid FlatBuffers packet from client " << client_id << endl;
+        return;
+    }
+    const GameProtocol::CSTeleport* teleport = msg->packet_as_CSTeleport();
+    if (!teleport) return;
+
+    CLIENT& cl = clients[client_id];
+    short new_x = teleport->target_x();
+    short new_y = teleport->target_y();
+
+    // 맵 범위 체크
+    if (new_x < 0 || new_x >= WORLD_WIDTH || new_y < 0 || new_y >= WORLD_HEIGHT) return;
+    if (obs[new_y][new_x]) return; // 장애물 체크
+
+    cl.vl.lock();
+    unordered_set<int> old_vl{ cl.viewlist };
+    cl.vl.unlock();
+
+    cl.x = new_x;
+    cl.y = new_y;
+
+    // 기존 시야 내 플레이어들에게 remove 전송
+    for (auto other : old_vl) {
+        if (is_player(other)) {
+            clients[other].vl.lock();
+            clients[other].viewlist.erase(client_id);
+            clients[other].vl.unlock();
+            send_remove_object(other, client_id);
+        }
+        cl.vl.lock();
+        cl.viewlist.erase(other);
+        cl.vl.unlock();
+        send_remove_object(client_id, other);
+    }
+
+    // 텔레포트 결과 전송
+    send_teleport_packet(client_id);
+
+    // 새 위치 주변 오브젝트 처리
+    for (auto& other : clients) {
+        if (other._id == client_id) continue;
+        if (ST_INGAME != other.get_state()) continue;
+        if (false == is_near(client_id, other.get_id())) continue;
+
+        cl.vl.lock();
+        cl.viewlist.insert(other._id);
+        cl.vl.unlock();
+        send_put_object(client_id, other._id);
+
+        if (!is_npc(other._id)) {
+            clients[other._id].vl.lock();
+            clients[other._id].viewlist.insert(client_id);
+            clients[other._id].vl.unlock();
+            send_put_object(other._id, client_id);
         }
     }
 }
 
 // -----------------------------------------------------------------------
-// 전역 핸들러 매니저 정의
+// PacketHandler 래퍼: unsigned char* 기반 → FlatBuffers 기반으로 변환
+//   PacketHandlerManager는 (int client_id, unsigned char* raw_buf)를 넘기는데
+//   raw_buf 앞 4바이트가 FlatBuffers 크기, 이후가 FlatBuffers 데이터입니다.
+// -----------------------------------------------------------------------
+using FBHandler = std::function<void(int, const uint8_t*, uint32_t)>;
+
+void MakePacketHandler(FBHandler fb_handler, int client_id, unsigned char* raw_buf)
+{
+    // raw_buf = [4바이트 little-endian 크기][FlatBuffers 데이터]
+    uint32_t fb_size = 
+        static_cast<uint32_t>(raw_buf[0])        |
+        (static_cast<uint32_t>(raw_buf[1]) << 8)  |
+        (static_cast<uint32_t>(raw_buf[2]) << 16) |
+        (static_cast<uint32_t>(raw_buf[3]) << 24);
+    const uint8_t* fb_data = raw_buf + 4;
+    fb_handler(client_id, fb_data, fb_size);
+}
+
+// -----------------------------------------------------------------------
+// 전역 핸들러 매니저
 // -----------------------------------------------------------------------
 PacketHandlerManager g_packet_handler;
 
-// 패킷 타입별 핸들러를 등록 (main에서 한 번 호출)
 void RegisterAllHandlers()
 {
-    g_packet_handler.RegisterHandler(CS_PACKET_LOGIN,  handle_login);
-    g_packet_handler.RegisterHandler(CS_PACKET_MOVE,   handle_move);
-    g_packet_handler.RegisterHandler(CS_PACKET_ATTACK, handle_attack);
+    g_packet_handler.RegisterHandler(CS_PACKET_LOGIN,
+        [](int cid, unsigned char* buf){ MakePacketHandler(handle_login,    cid, buf); });
+    g_packet_handler.RegisterHandler(CS_PACKET_MOVE,
+        [](int cid, unsigned char* buf){ MakePacketHandler(handle_move,     cid, buf); });
+    g_packet_handler.RegisterHandler(CS_PACKET_ATTACK,
+        [](int cid, unsigned char* buf){ MakePacketHandler(handle_attack,   cid, buf); });
+    g_packet_handler.RegisterHandler(CS_PACKET_CHAT,
+        [](int cid, unsigned char* buf){ MakePacketHandler(handle_chat,     cid, buf); });
+    g_packet_handler.RegisterHandler(CS_PACKET_TELEPORT,
+        [](int cid, unsigned char* buf){ MakePacketHandler(handle_teleport, cid, buf); });
 }
 
-// process_packet은 이제 단순 디스패처 역할만 수행
+// process_packet: 단순 디스패처
 void process_packet(int client_id, unsigned char* p)
 {
     g_packet_handler.Dispatch(client_id, p);
 }
 
+// -----------------------------------------------------------------------
+// Worker thread
+// -----------------------------------------------------------------------
 void worker()
 {
     for (;;) {
@@ -522,7 +572,6 @@ void worker()
         LONG64 iocp_key;
         WSAOVERLAPPED* p_over;
         BOOL ret = GetQueuedCompletionStatus(g_h_iocp, &num_byte, (PULONG_PTR)&iocp_key, &p_over, INFINITE);
-        //cout << "GQCS returned.\n";
         int client_id = static_cast<int>(iocp_key);
         EXP_OVER* exp_over = reinterpret_cast<EXP_OVER*>(p_over);
         if (FALSE == ret) {
@@ -543,21 +592,35 @@ void worker()
                 continue;
             }
             CLIENT& cl = clients[client_id];
-            int remain_data = num_byte + cl._prev_size;
-            unsigned char* packet_start = exp_over->_net_buf;
-            int packet_size = packet_start[0];
+            // 수신 버퍼에 이전 미처리 데이터 합산
+            int total = num_byte + cl._prev_size;
+            unsigned char* buf = exp_over->_net_buf;
 
-            while (packet_size <= remain_data) {
-                process_packet(client_id, packet_start);
-                remain_data -= packet_size;
-                packet_start += packet_size;
-                if (remain_data > 0) packet_size = packet_start[0];
-                else break;
+            // FlatBuffers 패킷 포맷: [1바이트 CS 타입][4바이트 크기][FlatBuffers 데이터]
+            // 최소 헤더 크기 = 5바이트 (type 1 + size 4)
+            while (total >= 5) {
+                uint8_t  pkt_type = buf[0];
+                uint32_t fb_size  =
+                    static_cast<uint32_t>(buf[1])        |
+                    (static_cast<uint32_t>(buf[2]) << 8)  |
+                    (static_cast<uint32_t>(buf[3]) << 16) |
+                    (static_cast<uint32_t>(buf[4]) << 24);
+                uint32_t full_size = 1 + 4 + fb_size; // type + size_field + fb_data
+                if (total < static_cast<int>(full_size)) break; // 아직 다 받지 못함
+
+                // PacketHandlerManager의 Dispatch는 (client_id, buf+1)을 받아
+                // MakePacketHandler 에서 [4바이트 크기][FlatBuffers 데이터]를 파싱
+                g_packet_handler.Dispatch(client_id, pkt_type, buf + 1);
+
+                total -= static_cast<int>(full_size);
+                buf   += full_size;
             }
 
-            if (0 < remain_data) {
-                cl._prev_size = remain_data;
-                memcpy(&exp_over->_net_buf, packet_start, remain_data);
+            if (total > 0) {
+                cl._prev_size = total;
+                memcpy(exp_over->_net_buf, buf, total);
+            } else {
+                cl._prev_size = 0;
             }
             cl.do_recv();
             break;
@@ -570,13 +633,11 @@ void worker()
             break;
         }
         case OP_ACCEPT: {
-           // cout << "Accept Completed.\n";
             SOCKET c_socket = *(reinterpret_cast<SOCKET*>(exp_over->_net_buf));
             int new_id = get_new_id();
             if (-1 == new_id) {
-                cout << "Maxmum user overflow. Accept aborted.\n";
-            }
-            else {
+                cout << "Maximum user overflow. Accept aborted.\n";
+            } else {
                 CLIENT& cl = clients[new_id];
                 cl.x = rand() % WORLD_WIDTH;
                 cl.y = rand() % WORLD_HEIGHT;
@@ -595,46 +656,46 @@ void worker()
             ZeroMemory(&exp_over->_wsa_over, sizeof(exp_over->_wsa_over));
             c_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
             *(reinterpret_cast<SOCKET*>(exp_over->_net_buf)) = c_socket;
-            AcceptEx(g_s_socket, c_socket, exp_over->_net_buf + 8, 0, sizeof(SOCKADDR_IN) + 16,
-                sizeof(SOCKADDR_IN) + 16, NULL, &exp_over->_wsa_over);
+            AcceptEx(g_s_socket, c_socket, exp_over->_net_buf + 8, 0,
+                sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
+                NULL, &exp_over->_wsa_over);
+            break;
         }
-                      break;
         case OP_NPC_MOVE: {
-                clients[client_id].state_lock.lock();
-                if (clients[client_id].get_state() != ST_INGAME) {
-                    clients[client_id].state_lock.unlock();
-                    clients[client_id].set_active(false);
-                    delete exp_over;
-                    break;
-                }
+            clients[client_id].state_lock.lock();
+            if (clients[client_id].get_state() != ST_INGAME) {
                 clients[client_id].state_lock.unlock();
-
-                if (exp_over->_target == -1) {
-                    delete exp_over;
-                    break;
-                }
-
-                // Lua: event_NPC_move(target_id) -> bool
-                // true 반환 시 C++에서 do_npc_move 실행
-                clients[client_id].Lua_Lock.lock();
-                lua_State* L = clients[client_id].L;
-                lua_getglobal(L, "event_NPC_move");   // 함수 push
-                lua_pushnumber(L, exp_over->_target);  // 인자: target player id
-                int err = lua_pcall(L, 1, 1, 0);       // 인자 1개, 반환값 1개
-                if (err != 0) {
-                    cout << "[Lua] event_NPC_move ERR: " << lua_tostring(L, -1) << endl;
-                    lua_pop(L, 1);
-                    clients[client_id].Lua_Lock.unlock();
-                    delete exp_over;
-                    break;
-                }
-                bool should_move = lua_toboolean(L, -1);
-                lua_pop(L, 1);
-                clients[client_id].Lua_Lock.unlock();
-
-                if (should_move) do_npc_move(client_id, exp_over->_target);
+                clients[client_id].set_active(false);
                 delete exp_over;
                 break;
+            }
+            clients[client_id].state_lock.unlock();
+
+            if (exp_over->_target == -1) {
+                delete exp_over;
+                break;
+            }
+
+            // Lua: event_NPC_move(target_id) -> bool
+            clients[client_id].Lua_Lock.lock();
+            lua_State* L = clients[client_id].L;
+            lua_getglobal(L, "event_NPC_move");
+            lua_pushnumber(L, exp_over->_target);
+            int err = lua_pcall(L, 1, 1, 0);
+            if (err != 0) {
+                cout << "[Lua] event_NPC_move ERR: " << lua_tostring(L, -1) << endl;
+                lua_pop(L, 1);
+                clients[client_id].Lua_Lock.unlock();
+                delete exp_over;
+                break;
+            }
+            bool should_move = lua_toboolean(L, -1);
+            lua_pop(L, 1);
+            clients[client_id].Lua_Lock.unlock();
+
+            if (should_move) do_npc_move(client_id, exp_over->_target);
+            delete exp_over;
+            break;
         }
         case OP_PLAYER_MOVE: {
             clients[client_id].Lua_Lock.lock();
@@ -653,13 +714,15 @@ void worker()
     }
 }
 
+// -----------------------------------------------------------------------
+// Lua API 함수들
+// -----------------------------------------------------------------------
 int API_SendMessage(lua_State* L)
 {
-    int my_id = (int)lua_tointeger(L, -3);
+    int my_id   = (int)lua_tointeger(L, -3);
     int user_id = (int)lua_tointeger(L, -2);
-    char* mess = (char*)lua_tostring(L, -1);
+    char* mess  = (char*)lua_tostring(L, -1);
     lua_pop(L, 4);
-
     send_chat_packet(user_id, my_id, mess);
     return 0;
 }
@@ -668,8 +731,7 @@ int API_get_x(lua_State* L)
 {
     int user_id = (int)lua_tointeger(L, -1);
     lua_pop(L, 2);
-    int x = clients[user_id].x;
-    lua_pushnumber(L, x);
+    lua_pushnumber(L, clients[user_id].x);
     return 1;
 }
 
@@ -677,90 +739,86 @@ int API_get_y(lua_State* L)
 {
     int user_id = (int)lua_tointeger(L, -1);
     lua_pop(L, 2);
-    int y = clients[user_id].y;
-    lua_pushnumber(L, y);
+    lua_pushnumber(L, clients[user_id].y);
     return 1;
 }
+
 int API_Touch_Message(lua_State* L)
 {
-    int my_id = (int)lua_tointeger(L, -3);
+    int my_id   = (int)lua_tointeger(L, -3);
     int user_id = (int)lua_tointeger(L, -2);
-    char* mess = (char*)lua_tostring(L, -1);
-
+    char* mess  = (char*)lua_tostring(L, -1);
     lua_pop(L, 4);
     this_thread::sleep_for(1s);
     for (int i = 1; i < 4; ++i) {
         timer_event ev;
-        ev.obj_id = my_id;
-        ev.target_id = user_id;
+        ev.obj_id     = my_id;
+        ev.target_id  = user_id;
         ev.start_time = chrono::system_clock::now() + chrono::seconds(i);
-        ev.ev = EVENT_NPC_MOVE;
+        ev.ev         = EVENT_NPC_MOVE;
         timer_queue.push(ev);
     }
-    //do_npc_move(my_id, 1s);
-    //do_npc_move(my_id, 2s);
-    //do_npc_move(my_id, 3s);
-
     this_thread::sleep_for(3s);
     send_chat_packet(user_id, my_id, mess);
     return 0;
 }
 
+// -----------------------------------------------------------------------
+// NPC 초기화
+// -----------------------------------------------------------------------
 void Initialize_NPC()
 {
     for (int i = NPC_ID_START; i <= NPC_ID_END; ++i) {
         clients[i]._type = rand() % 2 + 2;
-        if (clients[i]._type == 2) 
-        sprintf_s(clients[i].name, "DOG%d", i);
+        if (clients[i]._type == 2)
+            sprintf_s(clients[i].name, "DOG%d", i);
         if (clients[i]._type == 3)
             sprintf_s(clients[i].name, "CAT%d", i);
 
-        clients[i].x = rand() % WORLD_WIDTH;
-        clients[i].y = rand() % WORLD_HEIGHT;
-        clients[i]._id = i;
-        clients[i]._state = ST_INGAME;
+        clients[i].x          = rand() % WORLD_WIDTH;
+        clients[i].y          = rand() % WORLD_HEIGHT;
+        clients[i]._id        = i;
+        clients[i]._state     = ST_INGAME;
         clients[i]._is_active = false;
-        clients[i].exp = 100;
-        clients[i].hp = 100;
-        clients[i].maxhp = 100;
-        clients[i].dmg = 10 + (1 * 3);
+        clients[i].exp        = 100;
+        clients[i].hp         = 100;
+        clients[i].maxhp      = 100;
+        clients[i].dmg        = 10 + (1 * 3);
+
         lua_State* L = clients[i].L = luaL_newstate();
         luaL_openlibs(L);
-        int error = luaL_loadfile(L, "monster.lua") ||
-            lua_pcall(L, 0, 0, 0);
+        int error = luaL_loadfile(L, "monster.lua") || lua_pcall(L, 0, 0, 0);
         lua_getglobal(L, "set_uid");
         lua_pushnumber(L, i);
-        lua_pushnumber(L,clients[i].x);
-        lua_pushnumber(L,clients[i].y);
+        lua_pushnumber(L, clients[i].x);
+        lua_pushnumber(L, clients[i].y);
         lua_pcall(L, 3, 3, 0);
-        lua_pop(L, 4);// eliminate set_uid from stack after call
+        lua_pop(L, 4);
 
         lua_register(L, "API_get_x",       API_get_x);
         lua_register(L, "API_get_y",       API_get_y);
         lua_register(L, "API_SendMessage", API_SendMessage);
     }
 }
+
+// -----------------------------------------------------------------------
+// 장애물 초기화
+// -----------------------------------------------------------------------
 void Initialize_obstacle()
 {
-   /* for (int i = 0; i < 125'000; ++i)
-    {
-        
-        obstacle[i]._id = i;
-        obstacle[i].x = rand() % WORLD_HEIGHT; 
-        obstacle[i].y = rand() % WORLD_WIDTH;
-    }*/
     srand(2);
-    for (int i = 0; i < WORLD_HEIGHT; ++i)
-    {
-        for (int j = 0; j < WORLD_WIDTH; ++j)
-        {
-            
+    for (int i = 0; i < WORLD_HEIGHT; ++i) {
+        for (int j = 0; j < WORLD_WIDTH; ++j) {
             obs[i][j] = rand() % 4;
             if (obs[i][j]) obs[i][j] = 0;
             else obs[i][j] = 1;
         }
     }
 }
+
+// -----------------------------------------------------------------------
+// NPC 이동 함수들
+// -----------------------------------------------------------------------
 void npcmove(int npc_id)
 {
     auto& x = clients[npc_id].x;
@@ -769,45 +827,36 @@ void npcmove(int npc_id)
     case 0: if (y > 0 && (obs[y-1][x] == 0)) y--; break;
     case 1: if (y < (WORLD_HEIGHT - 1) && (obs[y+1][x] == 0)) y++; break;
     case 2: if (x > 0 && (obs[y][x-1] == 0)) x--; break;
-    case 3: if (x < (WORLD_WIDTH - 1) && (obs[y][x + 1] == 0)) x++; break;
+    case 3: if (x < (WORLD_WIDTH - 1) && (obs[y][x+1] == 0)) x++; break;
     }
-
     timer_event ev;
-    ev.obj_id = npc_id;
-    ev.target_id = 0;
+    ev.obj_id     = npc_id;
+    ev.target_id  = 0;
     ev.start_time = chrono::system_clock::now() + 1s;
-    ev.ev = EVENT_NPC_MOVE;
+    ev.ev         = EVENT_NPC_MOVE;
     timer_queue.push(ev);
 }
+
 void do_npc_move(int npc_id, int target, std::chrono::seconds time)
 {
-    // -------------------------------------------------------
-    // 1. 이동 전 시야 내 플레이어 목록 수집 (old_viewlist)
-    // -------------------------------------------------------
+    // 이동 전 시야 내 플레이어 목록
     unordered_set<int> old_viewlist;
     for (auto& obj : clients) {
-        if (obj._state != ST_INGAME)      continue;
-        if (!is_player(obj.get_id()))     continue;
+        if (obj._state != ST_INGAME)       continue;
+        if (!is_player(obj.get_id()))      continue;
         if (is_near(npc_id, obj.get_id())) old_viewlist.insert(obj._id);
     }
 
-    // -------------------------------------------------------
-    // 2. NPC 이동 (타겟 방향으로 1칸)
-    // -------------------------------------------------------
+    // NPC 이동 (타겟 방향으로 1칸)
     auto& x   = clients[npc_id].x;
     auto& y   = clients[npc_id].y;
     short t_x = clients[target].x;
     short t_y = clients[target].y;
 
-    if (t_x != x) {
-        x += (t_x > x) ? 1 : -1;
-    } else if (t_y != y) {
-        y += (t_y > y) ? 1 : -1;
-    }
+    if (t_x != x)       x += (t_x > x) ? 1 : -1;
+    else if (t_y != y)  y += (t_y > y) ? 1 : -1;
 
-    // -------------------------------------------------------
-    // 3. 이동 후 시야 내 플레이어 목록 수집 (new_viewlist)
-    // -------------------------------------------------------
+    // 이동 후 시야 내 플레이어 목록
     unordered_set<int> new_viewlist;
     for (auto& obj : clients) {
         if (obj._state != ST_INGAME)       continue;
@@ -815,26 +864,20 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
         if (is_near(npc_id, obj.get_id())) new_viewlist.insert(obj.get_id());
     }
 
-    // -------------------------------------------------------
-    // 4. 새로 시야에 들어온 플레이어 → put_object
-    //    계속 시야에 있는 플레이어  → move_packet
-    // -------------------------------------------------------
+    // 새로 시야에 들어온 플레이어 → put_object
+    // 계속 시야에 있는 플레이어 → move_packet
     for (auto pl : new_viewlist) {
         if (old_viewlist.count(pl) == 0) {
-            // 새로 시야에 들어옴
             clients[pl].vl.lock();
             clients[pl].viewlist.insert(npc_id);
             clients[pl].vl.unlock();
             send_put_object(pl, npc_id);
         } else {
-            // 계속 시야에 있음
             send_move_packet(pl, npc_id);
         }
     }
 
-    // -------------------------------------------------------
-    // 5. 시야에서 사라진 플레이어 → remove_object
-    // -------------------------------------------------------
+    // 시야에서 사라진 플레이어 → remove_object
     for (auto pl : old_viewlist) {
         if (new_viewlist.count(pl) == 0) {
             clients[pl].vl.lock();
@@ -844,9 +887,7 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
         }
     }
 
-    // -------------------------------------------------------
-    // 6. NPC 상태 확인 후 다음 이동 타이머 등록
-    // -------------------------------------------------------
+    // 다음 이동 타이머 등록
     clients[npc_id].state_lock.lock();
     if (clients[npc_id].get_state() != ST_INGAME) {
         clients[npc_id].state_lock.unlock();
@@ -855,14 +896,18 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
     clients[npc_id].state_lock.unlock();
 
     timer_event ev;
-    ev.obj_id    = npc_id;
-    ev.target_id = target;
+    ev.obj_id     = npc_id;
+    ev.target_id  = target;
     ev.start_time = chrono::system_clock::now() + time;
-    ev.ev = EVENT_NPC_MOVE;
+    ev.ev         = EVENT_NPC_MOVE;
     timer_queue.push(ev);
 }
-void do_timer() {
 
+// -----------------------------------------------------------------------
+// 타이머 스레드
+// -----------------------------------------------------------------------
+void do_timer()
+{
     chrono::system_clock::duration dura;
     const chrono::milliseconds waittime = 10ms;
     timer_event temp;
@@ -872,39 +917,37 @@ void do_timer() {
             temp_bool = false;
             EXP_OVER* ex_over = new EXP_OVER;
             ex_over->_comp_op = OP_NPC_MOVE;
-            PostQueuedCompletionStatus(g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);   //0�� ��������� ����
+            PostQueuedCompletionStatus(g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);
         }
 
         while (true) {
             timer_event ev;
             if (timer_queue.size() == 0) break;
             timer_queue.try_pop(ev);
-            
+
             dura = ev.start_time - chrono::system_clock::now();
             if (dura <= 0ms) {
                 EXP_OVER* ex_over = new EXP_OVER;
                 ex_over->_comp_op = OP_NPC_MOVE;
-                PostQueuedCompletionStatus(g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);   //0�� ��������� ����
-            }
-            else if (dura <= waittime) {
-                temp = ev;
+                PostQueuedCompletionStatus(g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);
+            } else if (dura <= waittime) {
+                temp      = ev;
                 temp_bool = true;
                 break;
-            }
-            else {
+            } else {
                 timer_queue.push(ev);
                 break;
             }
         }
         this_thread::sleep_for(dura);
-
     }
 }
 
-
+// -----------------------------------------------------------------------
+// main
+// -----------------------------------------------------------------------
 int main()
 {
-    //LoadDB("Youngin");
     Initialize_DB();
     Initialize_NPC();
     Initialize_obstacle();
@@ -916,8 +959,8 @@ int main()
     g_s_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
     SOCKADDR_IN server_addr;
     ZeroMemory(&server_addr, sizeof(server_addr));
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(SERVER_PORT);
+    server_addr.sin_family      = AF_INET;
+    server_addr.sin_port        = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     bind(g_s_socket, reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
     listen(g_s_socket, SOMAXCONN);
@@ -925,34 +968,29 @@ int main()
     g_h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
     CreateIoCompletionPort(reinterpret_cast<HANDLE>(g_s_socket), g_h_iocp, 0, 0);
 
-    SOCKET c_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
-    char   accept_buf[sizeof(SOCKADDR_IN) * 2 + 32 + 100];
-    EXP_OVER   accept_ex;
+    SOCKET  c_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+    char    accept_buf[sizeof(SOCKADDR_IN) * 2 + 32 + 100];
+    EXP_OVER accept_ex;
     *(reinterpret_cast<SOCKET*>(&accept_ex._net_buf)) = c_socket;
     ZeroMemory(&accept_ex._wsa_over, sizeof(accept_ex._wsa_over));
     accept_ex._comp_op = OP_ACCEPT;
 
-    AcceptEx(g_s_socket, c_socket, accept_buf, 0, sizeof(SOCKADDR_IN) + 16,
-        sizeof(SOCKADDR_IN) + 16, NULL, &accept_ex._wsa_over);
+    AcceptEx(g_s_socket, c_socket, accept_buf, 0,
+        sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
+        NULL, &accept_ex._wsa_over);
     cout << "Accept Called\n";
 
     for (int i = 0; i < MAX_USER; ++i)
-    {
         clients[i]._id = i;
-    }
     cout << "Creating Worker Threads\n";
 
-    
-
-    vector <thread> worker_threads;
-    //thread ai_thread{ do_ai };
+    vector<thread> worker_threads;
     thread timer_thread{ do_timer };
     for (int i = 0; i < 16; ++i)
         worker_threads.emplace_back(worker);
     for (auto& th : worker_threads)
         th.join();
 
-    //ai_thread.join();
     timer_thread.join();
     for (auto& cl : clients) {
         if (ST_INGAME == cl._state)
