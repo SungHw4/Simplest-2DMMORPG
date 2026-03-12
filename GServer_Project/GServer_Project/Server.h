@@ -5,41 +5,37 @@
 void error_display(int err_no);
 
 // 패킷 핸들러 함수 포인터 타입
-// void handler(int client_id, unsigned char* packet_buf)
-using PacketHandler = std::function<void(int, unsigned char*)>;
+// void handler(int client_id, const uint8_t* fb_data, uint32_t fb_size)
+// fb_data: messegeid 4바이트 이후의 순수 FlatBuffers 데이터
+// fb_size: FlatBuffers 데이터 크기
+using PacketHandler = std::function<void(int, const uint8_t*, uint32_t)>;
 
 // 패킷 타입별 핸들러를 등록하고 디스패치하는 매니저
+// 키: EPacketProtocol 값 (int32_t)
+// 수신 포맷: [4바이트 messegeid][FlatBuffers 데이터]
 class PacketHandlerManager {
 public:
-    // 패킷 타입에 핸들러 함수를 등록
-    void RegisterHandler(unsigned char packet_type, PacketHandler handler)
+    // EPacketProtocol 값(int32)으로 핸들러 등록
+    void RegisterHandler(int32_t messege_id, PacketHandler handler)
     {
-        handlers_[packet_type] = handler;
+        handlers_[messege_id] = handler;
     }
 
-    // 패킷 타입을 보고 등록된 핸들러를 호출
-    // [FlatBuffers 포맷] packet = [4바이트 크기][FlatBuffers 데이터]
-    // packet_type을 별도로 전달받아 디스패치
-    void Dispatch(int client_id, uint8_t packet_type, unsigned char* packet) const
+    // messegeid와 FlatBuffers 버퍼를 받아 핸들러 호출
+    void Dispatch(int client_id, int32_t messege_id,
+                  const uint8_t* fb_data, uint32_t fb_size) const
     {
-        auto it = handlers_.find(packet_type);
+        auto it = handlers_.find(messege_id);
         if (it != handlers_.end()) {
-            it->second(client_id, packet);
+            it->second(client_id, fb_data, fb_size);
         } else {
-            cout << "[PacketHandlerManager] Unknown packet type: "
-                 << static_cast<int>(packet_type) << endl;
+            cout << "[PacketHandlerManager] Unknown messegeid: "
+                 << messege_id << endl;
         }
     }
 
-    // Legacy overload (타입이 packet[1]에 있는 경우)
-    void Dispatch(int client_id, unsigned char* packet) const
-    {
-        unsigned char packet_type = packet[1];
-        Dispatch(client_id, packet_type, packet);
-    }
-
 private:
-    std::unordered_map<unsigned char, PacketHandler> handlers_;
+    std::unordered_map<int32_t, PacketHandler> handlers_;
 };
 
 extern PacketHandlerManager g_packet_handler;
