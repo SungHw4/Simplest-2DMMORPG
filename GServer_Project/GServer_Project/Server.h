@@ -18,9 +18,10 @@ public:
     }
 
     // 패킷 타입을 보고 등록된 핸들러를 호출
-    void Dispatch(int client_id, unsigned char* packet) const
+    // [FlatBuffers 포맷] packet = [4바이트 크기][FlatBuffers 데이터]
+    // packet_type을 별도로 전달받아 디스패치
+    void Dispatch(int client_id, uint8_t packet_type, unsigned char* packet) const
     {
-        unsigned char packet_type = packet[1];
         auto it = handlers_.find(packet_type);
         if (it != handlers_.end()) {
             it->second(client_id, packet);
@@ -28,6 +29,13 @@ public:
             cout << "[PacketHandlerManager] Unknown packet type: "
                  << static_cast<int>(packet_type) << endl;
         }
+    }
+
+    // Legacy overload (타입이 packet[1]에 있는 경우)
+    void Dispatch(int client_id, unsigned char* packet) const
+    {
+        unsigned char packet_type = packet[1];
+        Dispatch(client_id, packet_type, packet);
     }
 
 private:
