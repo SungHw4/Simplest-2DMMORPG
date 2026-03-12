@@ -169,9 +169,17 @@ void Activate_NPC_Move_Event(int target, int player_id)
 // CS_LoginRequest (101): 로그인
 void handle_login(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
+    // NAK 전송 람다: EErrorMsg를 채팅 응답(id=에러코드, message=에러이름)으로 전달 후 false 반환
+    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
+        auto framed = FBProtocol::BuildChattingNak(err);
+        send_fb_packet(client_id, framed);
+        return false;
+    };
+
     const GameProtocol::CSLogin* login = FBProtocol::ParseCSLogin(fb_data, fb_size);
     if (!login || !login->name()) {
         cout << "[handle_login] Invalid CSLogin from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
 
@@ -189,8 +197,8 @@ void handle_login(int client_id, const uint8_t* fb_data, uint32_t fb_size)
         // 로그인 성공: 현재 위치를 이동 응답으로 전달 (UP 방향은 placeholder)
         send_move_response(client_id, GameProtocol::Direction_UP);
     } else {
-        // 로그인 실패: 채팅으로 오류 메시지 전달
-        send_chatting_response(client_id, -1, "Login failed: character not found");
+        // 로그인 실패: EF_FAIL_WRONG_REQ NAK 전송
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
 
@@ -242,10 +250,18 @@ void handle_login(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 // CS_PlayerMoveRequest (201): 플레이어 이동
 void handle_move(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
+    // NAK 전송 람다: EErrorMsg를 이동 응답(messegeid=에러코드)으로 전달 후 false 반환
+    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
+        auto framed = FBProtocol::BuildMoveNak(err);
+        send_fb_packet(client_id, framed);
+        return false;
+    };
+
     const GameProtocol::CSPlayerMoveRequest* req =
         FBProtocol::ParseCSPlayerMoveRequest(fb_data, fb_size);
     if (!req) {
         cout << "[handle_move] Invalid CSPlayerMoveRequest from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
 
@@ -261,6 +277,7 @@ void handle_move(int client_id, const uint8_t* fb_data, uint32_t fb_size)
     case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;  // RIGHT
     default:
         cout << "[handle_move] Invalid direction from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
     cl.x = static_cast<short>(x);
@@ -357,10 +374,18 @@ void handle_move(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 // CS_PlayerAttackRequest (205): 공격
 void handle_attack(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
+    // NAK 전송 람다: EErrorMsg를 공격 응답(target_id=에러코드)으로 전달 후 false 반환
+    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
+        auto framed = FBProtocol::BuildAttackNak(err);
+        send_fb_packet(client_id, framed);
+        return false;
+    };
+
     const GameProtocol::CSPlayerAttackRequest* req =
         FBProtocol::ParseCSPlayerAttackRequest(fb_data, fb_size);
     if (!req) {
         cout << "[handle_attack] Invalid CSPlayerAttackRequest from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
 
@@ -388,10 +413,18 @@ void handle_attack(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 // CS_PlayerChattingRequest (301): 채팅
 void handle_chatting(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
+    // NAK 전송 람다: EErrorMsg를 채팅 응답(id=에러코드, message=에러이름)으로 전달 후 false 반환
+    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
+        auto framed = FBProtocol::BuildChattingNak(err);
+        send_fb_packet(client_id, framed);
+        return false;
+    };
+
     const GameProtocol::CSPlayerChattingRequest* req =
         FBProtocol::ParseCSPlayerChattingRequest(fb_data, fb_size);
     if (!req || !req->message()) {
         cout << "[handle_chatting] Invalid CSPlayerChattingRequest from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
         return;
     }
 
@@ -415,8 +448,21 @@ void handle_chatting(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 // CS_RandomTeleportRequest (401): 랜덤 텔레포트 (더미 동접 테스트용)
 void handle_random_teleport(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // 파싱 (검증만)
-    FBProtocol::ParseCSRandomTeleportRequest(fb_data, fb_size);
+    // NAK 전송 람다: EErrorMsg를 이동 응답(messegeid=에러코드)으로 전달 후 false 반환
+    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
+        auto framed = FBProtocol::BuildMoveNak(err);
+        send_fb_packet(client_id, framed);
+        return false;
+    };
+
+    // 파싱 및 검증
+    const GameProtocol::CSRandomTeleportRequest* req =
+        FBProtocol::ParseCSRandomTeleportRequest(fb_data, fb_size);
+    if (!req) {
+        cout << "[handle_random_teleport] Invalid CSRandomTeleportRequest from client " << client_id << endl;
+        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+        return;
+    }
 
     CLIENT& cl = clients[client_id];
 

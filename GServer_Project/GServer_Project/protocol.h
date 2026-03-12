@@ -144,6 +144,64 @@ inline std::vector<uint8_t> BuildChattingResponse(
 }
 
 // -----------------------------------------------------------------------
+// NAK(에러 응답) 빌더
+//   각 핸들러에서 패킷 파싱 실패 등 에러 발생 시 EErrorMsg를 담아 전송.
+//   - Move / Attack NAK : id 필드(int32)에 EErrorMsg 값을 캐스팅하여 전달.
+//     클라이언트는 id < 0 이거나 별도 약속된 음수값으로 NAK를 구분한다.
+//   - Chatting NAK     : id 필드에 EErrorMsg 값, message에 에러 이름 문자열.
+// -----------------------------------------------------------------------
+
+// SC_PlayerMoveResponse NAK (202): 이동 요청 실패 알림
+// direction 은 의미 없는 UP(0) 고정, messegeid 를 에러코드로 대체 전송.
+inline std::vector<uint8_t> BuildMoveNak(
+    GameProtocol::EErrorMsg err)
+{
+    Builder builder;
+    // messegeid 자리에 에러 코드를 넣어 NAK 임을 표시
+    auto resp = GameProtocol::CreateSCPlayerMoveResponse(
+        builder,
+        GameProtocol::Direction_UP,
+        static_cast<GameProtocol::EPacketProtocol>(err));
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_MOVE_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
+}
+
+// SC_PlayerAttackResponse NAK (206): 공격 요청 실패 알림
+// target_id 자리에 에러 코드를 넣어 NAK 임을 표시.
+inline std::vector<uint8_t> BuildAttackNak(
+    GameProtocol::EErrorMsg err)
+{
+    Builder builder;
+    auto resp = GameProtocol::CreateSCPlayerAttackResponse(
+        builder,
+        static_cast<int32_t>(err),   // target_id 자리에 에러 코드
+        GameProtocol::Direction_UP,
+        0, 0,
+        static_cast<GameProtocol::EPacketProtocol>(err));
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_ATTACK_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
+}
+
+// SC_PlayerChattingResponse NAK (302): 채팅/로그인 요청 실패 알림
+// id 자리에 EErrorMsg 값, message 에 에러 이름 문자열을 담는다.
+inline std::vector<uint8_t> BuildChattingNak(
+    GameProtocol::EErrorMsg err)
+{
+    Builder builder;
+    auto msg_str = builder.CreateString(GameProtocol::EnumNameEErrorMsg(err));
+    auto resp = GameProtocol::CreateSCPlayerChattingResponse(
+        builder,
+        static_cast<int32_t>(err),   // id 자리에 에러 코드
+        msg_str,
+        GameProtocol::EPacketProtocol_SC_PlayerChattingResponse);
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_CHATTING_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
+}
+
+// -----------------------------------------------------------------------
 // CS 패킷 역직렬화 헬퍼
 // -----------------------------------------------------------------------
 
