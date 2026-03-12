@@ -1,29 +1,33 @@
-// Game Protocol FlatBuffers Schema
+﻿// Game Protocol FlatBuffers Schema
 // This replaces the old C struct-based protocol with FlatBuffers
 
 namespace GameProtocol;
 
-// Packet type enums
-enum CSPacketType : byte {
-  LOGIN = 1,
-  MOVE = 2,
-  ATTACK = 3,
-  CHAT = 4,
-  TELEPORT = 5
-}
+enum EPacketProtocol : int 
+{
+  CS_LoginRequest   = 101,	//로그인
+  SDB_LoginRequest   = 102,
+  DBS_LoginResponse = 103,
+  SC_LoginResponse   = 104,
 
-enum SCPacketType : byte {
-  LOGIN_OK = 1,
-  MOVE = 2,
-  PUT_OBJECT = 3,
-  REMOVE_OBJECT = 4,
-  CHAT = 5,
-  LOGIN_FAIL = 6,
-  STATUS_CHANGE = 7,
-  OBSTACLE = 8,
-  ATTACK = 9,
-  LOGIN_NO = 10,
-  TELEPORT = 11
+  CS_PlayerMoveRequest  = 201,	//유저 이동
+  SC_PlayerMoveResponse = 202,
+  
+  CS_PlayerTeleportRequest  = 203,	//유저 텔포
+  SC_PlayerTeleportResponse = 204,
+
+  CS_PlayerAttackRequest  = 205,	//유저 공격
+  SC_PlayerAttackResponse = 206,
+
+
+  CS_PlayerChattingRequest  = 301,	//유저 채팅
+  SC_PlayerChattingResponse = 302,
+
+
+
+  CS_RandomTeleportRequest  = 401,	//더미 동접 테스트용 랜덤 텔포
+
+  Max
 }
 
 enum Direction : byte {
@@ -33,136 +37,70 @@ enum Direction : byte {
   RIGHT = 3
 }
 
-enum ObjectType : byte {
-  NONE = 0,
-  PLAYER = 1,
-  NPC_DOG = 2,
-  NPC_CAT = 3
+enum EErrorMsg : int 
+{
+   EF_NONE = 0,
+
+   EF_FAIL_WRONG_REQ = 10001,
+   EF_FAIL_DUPLICATE_NAME = 10002,
+
+   EF_MAX
+}
+
+// Packet type enums
+
+table MPositionXY {
+  x: short;
+  y: short;
+}
+
+table MPositionXYDir
+{
+  x: short;
+  y: short;
+  direction: Direction;
 }
 
 // Client to Server Messages
 table CSLogin {
-  name: string (required);
-}
-
-table CSMove {
-  direction: Direction;
-  move_time: uint;
-}
-
-table CSAttack {
-  target_id: int;
-}
-
-table CSChat {
-  message: string (required);
-}
-
-table CSTeleport {
-  target_x: short = 0;
-  target_y: short = 0;
-}
-
-// Server to Client Messages
-table SCLoginOk {
-  id: int;
-  x: short;
-  y: short;
-  level: short;
-  hp: short;
-  maxhp: short;
-  exp: int;
-}
-
-table SCMove {
-  id: int;
-  hp: short;
-  x: short;
-  y: short;
-  move_time: uint;
-}
-
-table SCPutObject {
-  id: int;
-  x: short;
-  y: short;
-  hp: short;
-  object_type: ObjectType;
   name: string;
 }
 
-table SCRemoveObject {
+table CSPlayerMoveRequest {
+  direction: Direction;
+  messegeid:EPacketProtocol = CS_PlayerMoveRequest;
+}
+
+table SCPlayerMoveResponse {
+  direction: Direction;
+  messegeid:EPacketProtocol = SC_PlayerMoveResponse;
+}
+
+table CSPlayerAttackRequest {
+  target_id: int;
+  direction: Direction;
+  messegeid:EPacketProtocol = CS_PlayerAttackRequest;
+}
+
+table SCPlayerAttackResponse {
+  target_id: int;
+  direction: Direction;
+  HP: int;
+  exp:int;
+  messegeid:EPacketProtocol = SC_PlayerAttackResponse;
+  }
+
+ table CSPlayerChattingRequest {
+  message: string ;
+  messegeid:EPacketProtocol = CS_PlayerChattingRequest;
+  }
+
+table SCPlayerChattingResponse {
   id: int;
-}
+  message: string ;
+  messegeid:EPacketProtocol = SC_PlayerChattingResponse;
+  }
 
-table SCChat {
-  id: int;
-  message: string (required);
-}
-
-table SCLoginFail {
-  reason: string;
-}
-
-table SCStatusChange {
-  level: short;
-  hp: short;
-  maxhp: short;
-  exp: int;
-}
-
-table SCAttack {
-  id: int;
-  x: short;
-  y: short;
-  hp: short;
-  exp: int;
-}
-
-table SCObstacle {
-  id: int;
-  x: short;
-  y: short;
-}
-
-table SCTeleport {
-  id: int;
-  x: short;
-  y: short;
-}
-
-// Union for Client packets
-union CSPacket {
-  CSLogin,
-  CSMove,
-  CSAttack,
-  CSChat,
-  CSTeleport
-}
-
-// Union for Server packets
-union SCPacket {
-  SCLoginOk,
-  SCMove,
-  SCPutObject,
-  SCRemoveObject,
-  SCChat,
-  SCLoginFail,
-  SCStatusChange,
-  SCAttack,
-  SCObstacle,
-  SCTeleport
-}
-
-// Root message wrapper for Client
-table CSMessage {
-  packet: CSPacket;
-}
-
-// Root message wrapper for Server
-table SCMessage {
-  packet: SCPacket;
-}
-
-root_type CSMessage;
-root_type SCMessage;
+  table CSRandomTeleportRequest {
+  messegeid:EPacketProtocol = CS_RandomTeleportRequest;
+  }
