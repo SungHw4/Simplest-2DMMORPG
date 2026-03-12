@@ -2,6 +2,9 @@
 
 #include "game_protocol_generated.h"
 #include <flatbuffers/flatbuffers.h>
+#include <vector>
+#include <cstdint>
+#include <cstring>
 
 // -----------------------------------------------------------------------
 // Server constants
@@ -17,260 +20,176 @@ constexpr int NPC_ID_START = MAX_USER;
 constexpr int NPC_ID_END   = MAX_USER + MAX_NPC - 1;
 
 // -----------------------------------------------------------------------
-// CS packet type constants (matches CSPacketType enum in .fbs)
+// EPacketProtocol 값 (EPacketProtocol enum과 동일, 편의용 상수)
 // -----------------------------------------------------------------------
-const uint8_t CS_PACKET_LOGIN    = 1;
-const uint8_t CS_PACKET_MOVE     = 2;
-const uint8_t CS_PACKET_ATTACK   = 3;
-const uint8_t CS_PACKET_CHAT     = 4;
-const uint8_t CS_PACKET_TELEPORT = 5;
+constexpr int32_t CS_LOGIN_REQUEST          = 101;
+constexpr int32_t SC_LOGIN_RESPONSE         = 104;
+
+constexpr int32_t CS_PLAYER_MOVE_REQUEST    = 201;
+constexpr int32_t SC_PLAYER_MOVE_RESPONSE   = 202;
+
+constexpr int32_t CS_PLAYER_TELEPORT_REQUEST  = 203;
+constexpr int32_t SC_PLAYER_TELEPORT_RESPONSE = 204;
+
+constexpr int32_t CS_PLAYER_ATTACK_REQUEST  = 205;
+constexpr int32_t SC_PLAYER_ATTACK_RESPONSE = 206;
+
+constexpr int32_t CS_PLAYER_CHATTING_REQUEST  = 301;
+constexpr int32_t SC_PLAYER_CHATTING_RESPONSE = 302;
+
+constexpr int32_t CS_RANDOM_TELEPORT_REQUEST  = 401;
 
 // -----------------------------------------------------------------------
-// SC packet type constants (matches SCPacketType enum in .fbs)
-// -----------------------------------------------------------------------
-const uint8_t SC_PACKET_LOGIN_OK       = 1;
-const uint8_t SC_PACKET_MOVE           = 2;
-const uint8_t SC_PACKET_PUT_OBJECT     = 3;
-const uint8_t SC_PACKET_REMOVE_OBJECT  = 4;
-const uint8_t SC_PACKET_CHAT           = 5;
-const uint8_t SC_PACKET_LOGIN_FAIL     = 6;
-const uint8_t SC_PACKET_STATUS_CHANGE  = 7;
-const uint8_t SC_PACKET_OBSTACLE       = 8;
-const uint8_t SC_PACKET_ATTACK         = 9;
-const uint8_t SC_PACKET_LOGIN_NO       = 10;
-const uint8_t SC_PACKET_TELEPORT       = 11;
-
-// -----------------------------------------------------------------------
-// FBProtocol namespace: FlatBuffers 직렬화/역직렬화 헬퍼
+// FBProtocol 네임스페이스
 //
-// 전송 포맷: [4바이트 little-endian 크기][FlatBuffers 바이트열]
-//   - do_send(buf)를 호출할 때 builder.GetBufferPointer() 앞에
-//     4바이트 크기 헤더를 붙여서 보냅니다.
+// 패킷 포맷 (CS/SC 공통):
+//   [4바이트 messegeid (int32 LE)][FlatBuffers 직렬화 데이터]
 //
-// 수신 포맷: 동일하게 [4바이트 크기][FlatBuffers 바이트열]
-//   - OP_RECV 핸들러에서 앞 4바이트를 크기로 읽어 분리한 뒤
-//     GetCSMessage()로 역직렬화합니다.
+// CSLogin 예외:
+//   CSLogin 테이블에는 messegeid 필드가 없으므로
+//   [4바이트 CS_LOGIN_REQUEST(101)][CSLogin FlatBuffers 데이터]
+//   로 처리합니다.
 // -----------------------------------------------------------------------
 namespace FBProtocol {
 
 using Builder = flatbuffers::FlatBufferBuilder;
 
 // -----------------------------------------------------------------------
-// Helper: FlatBuffers 버퍼를 [4바이트 크기 헤더 + 데이터] 형태로 전송
-//   반환값: {헤더+데이터 합친 vector<uint8_t>}
-//   이 vector를 do_send(size, data)에 넘기면 됩니다.
+// Helper: 직렬화된 FlatBuffers 버퍼 앞에 4바이트 messegeid 헤더를 붙여 반환
 // -----------------------------------------------------------------------
-inline std::vector<uint8_t> FinishAndFrame(Builder& builder,
-                                            flatbuffers::Offset<GameProtocol::SCMessage> root)
+inline std::vector<uint8_t> Frame(int32_t messege_id,
+                                   const uint8_t* fb_buf,
+                                   uint32_t fb_size)
 {
-    builder.Finish(root);
-    const uint8_t* buf  = builder.GetBufferPointer();
-    uint32_t        size = builder.GetSize();
-
-    std::vector<uint8_t> framed(4 + size);
-    framed[0] = static_cast<uint8_t>(size & 0xFF);
-    framed[1] = static_cast<uint8_t>((size >> 8)  & 0xFF);
-    framed[2] = static_cast<uint8_t>((size >> 16) & 0xFF);
-    framed[3] = static_cast<uint8_t>((size >> 24) & 0xFF);
-    std::memcpy(framed.data() + 4, buf, size);
+    std::vector<uint8_t> framed(4 + fb_size);
+    framed[0] = static_cast<uint8_t>(messege_id & 0xFF);
+    framed[1] = static_cast<uint8_t>((messege_id >> 8)  & 0xFF);
+    framed[2] = static_cast<uint8_t>((messege_id >> 16) & 0xFF);
+    framed[3] = static_cast<uint8_t>((messege_id >> 24) & 0xFF);
+    std::memcpy(framed.data() + 4, fb_buf, fb_size);
     return framed;
 }
 
 // -----------------------------------------------------------------------
-// CS 메시지 역직렬화
+// 수신 버퍼에서 messegeid 추출 (앞 4바이트)
 // -----------------------------------------------------------------------
-inline const GameProtocol::CSMessage* ParseCSMessage(const uint8_t* data, uint32_t size)
+inline int32_t ReadMessegeId(const uint8_t* buf)
 {
-    flatbuffers::Verifier verifier(data, size);
-    if (!GameProtocol::VerifyCSMessageBuffer(verifier)) return nullptr;
-    return GameProtocol::GetCSMessage(data);
+    return static_cast<int32_t>(
+        static_cast<uint32_t>(buf[0])        |
+        (static_cast<uint32_t>(buf[1]) << 8)  |
+        (static_cast<uint32_t>(buf[2]) << 16) |
+        (static_cast<uint32_t>(buf[3]) << 24));
 }
 
 // -----------------------------------------------------------------------
-// SC → Client 패킷 빌더 함수들
+// SC → Client 패킷 빌더
 // -----------------------------------------------------------------------
 
-inline std::vector<uint8_t> BuildLoginOk(int id, short x, short y,
-                                          short level, short hp, short maxhp, int exp)
+// SC_LoginResponse (104): 로그인 성공 → 클라이언트에게 캐릭터 정보 전송
+// 새 프로토콜에 SCLoginOk 테이블이 없으므로 CSLogin 응답으로
+// 위치 정보는 SCPlayerMoveResponse를 활용하거나 별도 테이블로 처리.
+// 여기서는 로그인 응답에 필요한 기본 정보를 SCPlayerMoveResponse로 전달.
+// (향후 서버에서 별도 SCLoginResponse 테이블 추가 권장)
+inline std::vector<uint8_t> BuildLoginResponse(
+    GameProtocol::Direction dir, int32_t msg_id = SC_LOGIN_RESPONSE)
 {
     Builder builder;
-    auto login_ok = GameProtocol::CreateSCLoginOk(builder, id, x, y, level, hp, maxhp, exp);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCLoginOk, login_ok.Union());
-    return FinishAndFrame(builder, msg);
+    auto resp = GameProtocol::CreateSCPlayerMoveResponse(
+        builder, dir,
+        static_cast<GameProtocol::EPacketProtocol>(SC_LOGIN_RESPONSE));
+    builder.Finish(resp);
+    return Frame(SC_LOGIN_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
 }
 
-inline std::vector<uint8_t> BuildLoginFail(const char* reason)
+// SC_PlayerMoveResponse (202): 플레이어/NPC 이동 브로드캐스트
+inline std::vector<uint8_t> BuildMoveResponse(
+    GameProtocol::Direction dir)
 {
     Builder builder;
-    auto reason_str = builder.CreateString(reason ? reason : "");
-    auto login_fail = GameProtocol::CreateSCLoginFail(builder, reason_str);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCLoginFail, login_fail.Union());
-    return FinishAndFrame(builder, msg);
+    auto resp = GameProtocol::CreateSCPlayerMoveResponse(
+        builder, dir,
+        GameProtocol::EPacketProtocol_SC_PlayerMoveResponse);
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_MOVE_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
 }
 
-inline std::vector<uint8_t> BuildMove(int id, short hp, short x, short y, uint32_t move_time)
+// SC_PlayerAttackResponse (206): 공격 결과
+inline std::vector<uint8_t> BuildAttackResponse(
+    int target_id, GameProtocol::Direction dir, int hp, int exp)
 {
     Builder builder;
-    auto move = GameProtocol::CreateSCMove(builder, id, hp, x, y, move_time);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCMove, move.Union());
-    return FinishAndFrame(builder, msg);
+    auto resp = GameProtocol::CreateSCPlayerAttackResponse(
+        builder, target_id, dir, hp, exp,
+        GameProtocol::EPacketProtocol_SC_PlayerAttackResponse);
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_ATTACK_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
 }
 
-inline std::vector<uint8_t> BuildPutObject(int id, short x, short y, short hp,
-                                             GameProtocol::ObjectType obj_type, const char* name)
-{
-    Builder builder;
-    auto name_str = builder.CreateString(name ? name : "");
-    auto put = GameProtocol::CreateSCPutObject(builder, id, x, y, hp, obj_type, name_str);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCPutObject, put.Union());
-    return FinishAndFrame(builder, msg);
-}
-
-inline std::vector<uint8_t> BuildRemoveObject(int id)
-{
-    Builder builder;
-    auto remove = GameProtocol::CreateSCRemoveObject(builder, id);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCRemoveObject, remove.Union());
-    return FinishAndFrame(builder, msg);
-}
-
-inline std::vector<uint8_t> BuildChat(int id, const char* message)
+// SC_PlayerChattingResponse (302): 채팅 메시지 브로드캐스트
+inline std::vector<uint8_t> BuildChattingResponse(
+    int sender_id, const char* message)
 {
     Builder builder;
     auto msg_str = builder.CreateString(message ? message : "");
-    auto chat = GameProtocol::CreateSCChat(builder, id, msg_str);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCChat, chat.Union());
-    return FinishAndFrame(builder, msg);
+    auto resp = GameProtocol::CreateSCPlayerChattingResponse(
+        builder, sender_id, msg_str,
+        GameProtocol::EPacketProtocol_SC_PlayerChattingResponse);
+    builder.Finish(resp);
+    return Frame(SC_PLAYER_CHATTING_RESPONSE,
+                 builder.GetBufferPointer(), builder.GetSize());
 }
 
-inline std::vector<uint8_t> BuildAttack(int id, short x, short y, short hp, int exp)
+// -----------------------------------------------------------------------
+// CS 패킷 역직렬화 헬퍼
+// -----------------------------------------------------------------------
+
+// CSLogin 역직렬화 (messegeid 없음, fb_data가 CSLogin 버퍼)
+inline const GameProtocol::CSLogin* ParseCSLogin(
+    const uint8_t* fb_data, uint32_t fb_size)
 {
-    Builder builder;
-    auto attack = GameProtocol::CreateSCAttack(builder, id, x, y, hp, exp);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCAttack, attack.Union());
-    return FinishAndFrame(builder, msg);
+    flatbuffers::Verifier v(fb_data, fb_size);
+    if (!v.VerifyBuffer<GameProtocol::CSLogin>()) return nullptr;
+    return flatbuffers::GetRoot<GameProtocol::CSLogin>(fb_data);
 }
 
-inline std::vector<uint8_t> BuildStatusChange(short level, short hp, short maxhp, int exp)
+// CSPlayerMoveRequest 역직렬화
+inline const GameProtocol::CSPlayerMoveRequest* ParseCSPlayerMoveRequest(
+    const uint8_t* fb_data, uint32_t fb_size)
 {
-    Builder builder;
-    auto status = GameProtocol::CreateSCStatusChange(builder, level, hp, maxhp, exp);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCStatusChange, status.Union());
-    return FinishAndFrame(builder, msg);
+    flatbuffers::Verifier v(fb_data, fb_size);
+    if (!v.VerifyBuffer<GameProtocol::CSPlayerMoveRequest>()) return nullptr;
+    return flatbuffers::GetRoot<GameProtocol::CSPlayerMoveRequest>(fb_data);
 }
 
-inline std::vector<uint8_t> BuildObstacle(int id, short x, short y)
+// CSPlayerAttackRequest 역직렬화
+inline const GameProtocol::CSPlayerAttackRequest* ParseCSPlayerAttackRequest(
+    const uint8_t* fb_data, uint32_t fb_size)
 {
-    Builder builder;
-    auto obstacle = GameProtocol::CreateSCObstacle(builder, id, x, y);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCObstacle, obstacle.Union());
-    return FinishAndFrame(builder, msg);
+    flatbuffers::Verifier v(fb_data, fb_size);
+    if (!v.VerifyBuffer<GameProtocol::CSPlayerAttackRequest>()) return nullptr;
+    return flatbuffers::GetRoot<GameProtocol::CSPlayerAttackRequest>(fb_data);
 }
 
-inline std::vector<uint8_t> BuildTeleport(int id, short x, short y)
+// CSPlayerChattingRequest 역직렬화
+inline const GameProtocol::CSPlayerChattingRequest* ParseCSPlayerChattingRequest(
+    const uint8_t* fb_data, uint32_t fb_size)
 {
-    Builder builder;
-    auto teleport = GameProtocol::CreateSCTeleport(builder, id, x, y);
-    auto msg = GameProtocol::CreateSCMessage(builder,
-        GameProtocol::SCPacket_SCTeleport, teleport.Union());
-    return FinishAndFrame(builder, msg);
+    flatbuffers::Verifier v(fb_data, fb_size);
+    if (!v.VerifyBuffer<GameProtocol::CSPlayerChattingRequest>()) return nullptr;
+    return flatbuffers::GetRoot<GameProtocol::CSPlayerChattingRequest>(fb_data);
+}
+
+// CSRandomTeleportRequest 역직렬화
+inline const GameProtocol::CSRandomTeleportRequest* ParseCSRandomTeleportRequest(
+    const uint8_t* fb_data, uint32_t fb_size)
+{
+    flatbuffers::Verifier v(fb_data, fb_size);
+    if (!v.VerifyBuffer<GameProtocol::CSRandomTeleportRequest>()) return nullptr;
+    return flatbuffers::GetRoot<GameProtocol::CSRandomTeleportRequest>(fb_data);
 }
 
 } // namespace FBProtocol
-
-// -----------------------------------------------------------------------
-// Legacy struct definitions (kept for reference only - DO NOT use in new code)
-// -----------------------------------------------------------------------
-#pragma pack (push, 1)
-struct cs_packet_login {
-    unsigned char size;
-    char    type;
-    char    name[MAX_NAME_SIZE];
-};
-
-struct cs_packet_move {
-    unsigned char size;
-    char    type;
-    char    direction;
-    int     move_time;
-};
-
-struct cs_packet_attack {
-    unsigned char size;
-    char    type;
-    int id;
-};
-
-struct cs_packet_chat {
-    unsigned char size;
-    char    type;
-    char    message[MAX_CHAT_SIZE];
-};
-
-struct sc_packet_login_ok {
-    unsigned char size;
-    char type;
-    int     id;
-    short   x, y;
-    short   level;
-    short   hp, maxhp;
-    int     exp;
-};
-
-struct sc_packet_move {
-    unsigned char size;
-    char type;
-    int     id;
-    int hp;
-    short  x, y;
-    int     move_time;
-};
-
-struct sc_packet_put_object {
-    unsigned char size;
-    char type;
-    int id;
-    short x, y;
-    int hp;
-    char object_type;
-    char    name[MAX_NAME_SIZE];
-};
-
-struct sc_packet_remove_object {
-    unsigned char size;
-    char type;
-    int id;
-};
-
-struct sc_packet_chat {
-    unsigned char size;
-    char type;
-    int id;
-    char message[MAX_CHAT_SIZE];
-};
-
-struct sc_packet_attack {
-    unsigned char size;
-    char type;
-    int id;
-    short x, y;
-    short hp;
-    int exp;
-};
-
-struct sc_packet_obstacle {
-    unsigned char size;
-    char type;
-    int id;
-    short x, y;
-};
-#pragma pack(pop)
