@@ -2,10 +2,20 @@
 
 #include "stdafx.h"
 #include "DataBase.h"
+#include "GameService.h"
+#include "GameDBService.h"
 
 HANDLE g_h_iocp;
 SOCKET g_s_socket;
 mutex LuaLock;
+
+// -----------------------------------------------------------------------
+// 전역 서비스 인스턴스
+//   GameService  : 인게임 로직 처리 (CS 패킷 핸들러)
+//   GameDBService: DB 비동기 처리 (InnerPacket 핸들러)
+// -----------------------------------------------------------------------
+GameService    g_GameService;
+GameDBService  g_DBService;
 
 BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 
@@ -91,17 +101,14 @@ void send_fb_packet(int c_id, std::vector<uint8_t>& framed)
 }
 
 // -----------------------------------------------------------------------
-// SC → Client 전송 함수들
+// SC → Client 전송 함수들 (NPC 이동 등 서비스 외부에서도 사용)
 // -----------------------------------------------------------------------
-
-// 이동 결과 전송 (SC_PlayerMoveResponse, 202)
 void send_move_response(int c_id, GameProtocol::Direction dir)
 {
     auto framed = FBProtocol::BuildMoveResponse(dir);
     send_fb_packet(c_id, framed);
 }
 
-// 공격 결과 전송 (SC_PlayerAttackResponse, 206)
 void send_attack_response(int c_id, int target_id,
                           GameProtocol::Direction dir, int hp, int exp)
 {
@@ -109,7 +116,6 @@ void send_attack_response(int c_id, int target_id,
     send_fb_packet(c_id, framed);
 }
 
-// 채팅 전송 (SC_PlayerChattingResponse, 302)
 void send_chatting_response(int c_id, int sender_id, const char* message)
 {
     auto framed = FBProtocol::BuildChattingResponse(sender_id, message);
@@ -163,354 +169,53 @@ void Activate_NPC_Move_Event(int target, int player_id)
 }
 
 // -----------------------------------------------------------------------
-// CS → Server 패킷 핸들러 함수 (EPacketProtocol 기반)
+// CS → Server 패킷 핸들러
+//   기존 전역 함수 방식에서 GameService 로 위임하는 브릿지만 남긴다.
+//   실제 로직은 GameService.cpp 의 Handle_* 함수들이 담당한다.
 // -----------------------------------------------------------------------
 
-// CS_LoginRequest (101): 로그인
+// CS_LoginRequest (101)
 void handle_login(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // NAK 전송 람다: EErrorMsg를 채팅 응답(id=에러코드, message=에러이름)으로 전달 후 false 반환
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        auto framed = FBProtocol::BuildChattingNak(err);
-        send_fb_packet(client_id, framed);
-        return false;
-    };
+    // GameService 로 패킷 Push — 실제 처리는 GameService::Handle_Login
+    auto pPacket = Packet::New(client_id,
+        CS_LOGIN_REQUEST, fb_data, fb_size);
+    g_GameService.Push(pPacket);
 
-    const GameProtocol::CSLogin* login = FBProtocol::ParseCSLogin(fb_data, fb_size);
-    if (!login || !login->name()) {
-        cout << "[handle_login] Invalid CSLogin from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
+    // --- 이하 기존 로그인 로직은 GameService::Handle_Login 으로 이관됨 ---
 
-    CLIENT& cl = clients[client_id];
-    strncpy_s(cl.name, login->name()->c_str(), MAX_NAME_SIZE - 1);
-
-    if (Load_DB(cl.name)) {
-        cl.x     = static_cast<short>(p_x);
-        cl.y     = static_cast<short>(p_y);
-        cl.level = static_cast<short>(p_lv);
-        cl.maxhp = static_cast<short>(p_maxhp);
-        cl.hp    = static_cast<short>(p_hp);
-        cl.exp   = p_exp;
-        cl.dmg   = 10 + (p_lv * 3);
-        // 로그인 성공: 현재 위치를 이동 응답으로 전달 (UP 방향은 placeholder)
-        send_move_response(client_id, GameProtocol::Direction_UP);
-    } else {
-        // 로그인 실패: EF_FAIL_WRONG_REQ NAK 전송
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-
-    cl.state_lock.lock();
-    cl._state = ST_INGAME;
-    cl.state_lock.unlock();
-
-    // 주변 플레이어들에게 새 플레이어 알림 + NPC 활성화
-    for (auto& other : clients) {
-        if (other._id == client_id) continue;
-        other.state_lock.lock();
-        if (ST_INGAME != other._state) { other.state_lock.unlock(); continue; }
-        other.state_lock.unlock();
-        if (false == is_near(other._id, client_id)) continue;
-
-        if (is_npc(other._id)) {
-            timer_event ev;
-            ev.obj_id     = other._id;
-            ev.target_id  = client_id;
-            ev.start_time = chrono::system_clock::now() + 1s;
-            ev.ev         = EVENT_NPC_MOVE;
-            timer_queue.push(ev);
-            continue;
-        }
-
-        other.vl.lock();
-        other.viewlist.insert(client_id);
-        other.vl.unlock();
-        // 주변 플레이어에게 새 플레이어 이동 응답 전송
-        send_move_response(other._id, GameProtocol::Direction_UP);
-    }
-
-    // 새 플레이어에게 주변 오브젝트 정보 전송
-    for (auto& other : clients) {
-        if (other._id == client_id) continue;
-        other.state_lock.lock();
-        if (ST_INGAME != other._state) { other.state_lock.unlock(); continue; }
-        other.state_lock.unlock();
-        if (false == is_near(other._id, client_id)) continue;
-
-        clients[client_id].vl.lock();
-        clients[client_id].viewlist.insert(other._id);
-        clients[client_id].vl.unlock();
-        // 새 플레이어에게 주변 오브젝트의 이동 응답 전송
-        send_move_response(client_id, GameProtocol::Direction_UP);
-    }
 }
 
-// CS_PlayerMoveRequest (201): 플레이어 이동
+// CS_PlayerMoveRequest (201)
 void handle_move(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // NAK 전송 람다: EErrorMsg를 이동 응답(messegeid=에러코드)으로 전달 후 false 반환
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        auto framed = FBProtocol::BuildMoveNak(err);
-        send_fb_packet(client_id, framed);
-        return false;
-    };
-
-    const GameProtocol::CSPlayerMoveRequest* req =
-        FBProtocol::ParseCSPlayerMoveRequest(fb_data, fb_size);
-    if (!req) {
-        cout << "[handle_move] Invalid CSPlayerMoveRequest from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-
-    CLIENT& cl = clients[client_id];
-    GameProtocol::Direction dir = req->direction();
-
-    int x = cl.x;
-    int y = cl.y;
-    switch (static_cast<int>(dir)) {
-    case 0: if (y > 0 && obs[y-1][x] == 0) y--; break;              // UP
-    case 1: if (y < (WORLD_HEIGHT - 1) && obs[y+1][x] == 0) y++; break; // DOWN
-    case 2: if (x > 0 && obs[y][x-1] == 0) x--; break;              // LEFT
-    case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;  // RIGHT
-    default:
-        cout << "[handle_move] Invalid direction from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-    cl.x = static_cast<short>(x);
-    cl.y = static_cast<short>(y);
-
-    // nearlist: 이동 후 시야 내 오브젝트 목록
-    unordered_set<int> nearlist;
-    for (auto& other : clients) {
-        if (other._id == client_id) continue;
-        if (ST_INGAME != other.get_state()) continue;
-        if (false == is_near(client_id, other.get_id())) continue;
-        if (is_npc(other.get_id())) {
-            if (!other._is_active) {
-                other.set_active(true);
-                timer_event ev;
-                ev.obj_id     = other.get_id();
-                ev.start_time = chrono::system_clock::now() + 1s;
-                ev.target_id  = client_id;
-                timer_queue.push(ev);
-                Activate_Player_Move_Event(other.get_id(), cl.get_id());
-            }
-        }
-        nearlist.insert(other.get_id());
-    }
-
-    // 자신에게 이동 결과 전송
-    send_move_response(cl._id, dir);
-
-    cl.vl.lock();
-    unordered_set<int> my_vl{ cl.viewlist };
-    cl.vl.unlock();
-
-    // 새로 시야에 들어온 오브젝트 처리
-    for (auto other : nearlist) {
-        if (0 == my_vl.count(other)) {
-            cl.vl.lock();
-            cl.viewlist.insert(other);
-            cl.vl.unlock();
-            send_move_response(cl._id, dir); // 새 오브젝트에 대한 put 대용
-
-            if (is_npc(other)) {
-                timer_event ev;
-                ev.obj_id     = other;
-                ev.target_id  = client_id;
-                ev.start_time = chrono::system_clock::now() + 1s;
-                ev.ev         = EVENT_NPC_MOVE;
-                timer_queue.push(ev);
-                continue;
-            }
-
-            clients[other].vl.lock();
-            if (0 == clients[other].viewlist.count(cl._id)) {
-                clients[other].viewlist.insert(cl._id);
-                clients[other].vl.unlock();
-                send_move_response(other, dir);
-            } else {
-                clients[other].vl.unlock();
-                send_move_response(other, dir);
-            }
-        } else {
-            if (is_npc(other)) continue;
-            clients[other].vl.lock();
-            bool in_other_vl = clients[other].viewlist.count(cl._id) > 0;
-            if (in_other_vl) {
-                clients[other].vl.unlock();
-            } else {
-                clients[other].viewlist.insert(cl._id);
-                clients[other].vl.unlock();
-            }
-            send_move_response(other, dir);
-        }
-    }
-
-    // 시야에서 사라진 오브젝트 처리
-    for (auto other : my_vl) {
-        if (0 == nearlist.count(other)) {
-            cl.vl.lock();
-            cl.viewlist.erase(other);
-            cl.vl.unlock();
-
-            if (is_npc(other)) continue;
-
-            clients[other].vl.lock();
-            if (0 != clients[other].viewlist.count(cl._id)) {
-                clients[other].viewlist.erase(cl._id);
-                clients[other].vl.unlock();
-            } else {
-                clients[other].vl.unlock();
-            }
-        }
-    }
+    auto pPacket = Packet::New(client_id, CS_PLAYER_MOVE_REQUEST, fb_data, fb_size);
+    g_GameService.Push(pPacket);
+    // 실제 로직은 GameService::Handle_Move 로 이관
 }
 
-// CS_PlayerAttackRequest (205): 공격
+// CS_PlayerAttackRequest (205)
 void handle_attack(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // NAK 전송 람다: EErrorMsg를 공격 응답(target_id=에러코드)으로 전달 후 false 반환
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        auto framed = FBProtocol::BuildAttackNak(err);
-        send_fb_packet(client_id, framed);
-        return false;
-    };
-
-    const GameProtocol::CSPlayerAttackRequest* req =
-        FBProtocol::ParseCSPlayerAttackRequest(fb_data, fb_size);
-    if (!req) {
-        cout << "[handle_attack] Invalid CSPlayerAttackRequest from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-
-    CLIENT& cl = clients[client_id];
-    GameProtocol::Direction dir = req->direction();
-
-    cl.vl.lock();
-    unordered_set<int> my_vl{ cl.viewlist };
-    cl.vl.unlock();
-
-    for (auto& k : my_vl) {
-        if (is_attack_range(client_id, k)) {
-            clients[client_id].hp -= clients[k].dmg;
-            clients[k].hp         -= clients[client_id].dmg;
-            // 피격 대상(k) HP 정보를 공격자에게 전송
-            send_attack_response(client_id, k, dir,
-                                 clients[k].hp, clients[k].exp);
-        }
-    }
-    // 자기 자신 HP 업데이트
-    send_attack_response(client_id, client_id, dir,
-                         clients[client_id].hp, clients[client_id].exp);
+    auto pPacket = Packet::New(client_id, CS_PLAYER_ATTACK_REQUEST, fb_data, fb_size);
+    g_GameService.Push(pPacket);
+    // 실제 로직은 GameService::Handle_Attack 으로 이관
 }
 
-// CS_PlayerChattingRequest (301): 채팅
+// CS_PlayerChattingRequest (301)
 void handle_chatting(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // NAK 전송 람다: EErrorMsg를 채팅 응답(id=에러코드, message=에러이름)으로 전달 후 false 반환
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        auto framed = FBProtocol::BuildChattingNak(err);
-        send_fb_packet(client_id, framed);
-        return false;
-    };
-
-    const GameProtocol::CSPlayerChattingRequest* req =
-        FBProtocol::ParseCSPlayerChattingRequest(fb_data, fb_size);
-    if (!req || !req->message()) {
-        cout << "[handle_chatting] Invalid CSPlayerChattingRequest from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-
-    const char* message = req->message()->c_str();
-
-    CLIENT& cl = clients[client_id];
-    cl.vl.lock();
-    unordered_set<int> my_vl{ cl.viewlist };
-    cl.vl.unlock();
-
-    // 자신에게 전송
-    send_chatting_response(client_id, client_id, message);
-    // 시야 내 플레이어들에게 전송
-    for (auto other : my_vl) {
-        if (is_player(other)) {
-            send_chatting_response(other, client_id, message);
-        }
-    }
+    auto pPacket = Packet::New(client_id, CS_PLAYER_CHATTING_REQUEST, fb_data, fb_size);
+    g_GameService.Push(pPacket);
+    // 실제 로직은 GameService::Handle_Chatting 으로 이관
 }
 
-// CS_RandomTeleportRequest (401): 랜덤 텔레포트 (더미 동접 테스트용)
+// CS_RandomTeleportRequest (401)
 void handle_random_teleport(int client_id, const uint8_t* fb_data, uint32_t fb_size)
 {
-    // NAK 전송 람다: EErrorMsg를 이동 응답(messegeid=에러코드)으로 전달 후 false 반환
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        auto framed = FBProtocol::BuildMoveNak(err);
-        send_fb_packet(client_id, framed);
-        return false;
-    };
-
-    // 파싱 및 검증
-    const GameProtocol::CSRandomTeleportRequest* req =
-        FBProtocol::ParseCSRandomTeleportRequest(fb_data, fb_size);
-    if (!req) {
-        cout << "[handle_random_teleport] Invalid CSRandomTeleportRequest from client " << client_id << endl;
-        SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
-        return;
-    }
-
-    CLIENT& cl = clients[client_id];
-
-    // 시야 내 오브젝트들의 viewlist 정리
-    cl.vl.lock();
-    unordered_set<int> old_vl{ cl.viewlist };
-    cl.viewlist.clear();
-    cl.vl.unlock();
-
-    for (auto other : old_vl) {
-        if (!is_npc(other)) {
-            clients[other].vl.lock();
-            clients[other].viewlist.erase(client_id);
-            clients[other].vl.unlock();
-        }
-    }
-
-    // 랜덤 위치로 이동
-    int new_x, new_y;
-    do {
-        new_x = rand() % WORLD_WIDTH;
-        new_y = rand() % WORLD_HEIGHT;
-    } while (obs[new_y][new_x]);
-
-    cl.x = static_cast<short>(new_x);
-    cl.y = static_cast<short>(new_y);
-
-    // 새 위치를 이동 응답으로 알림
-    send_move_response(client_id, GameProtocol::Direction_UP);
-
-    // 새 위치 주변 오브젝트 처리
-    for (auto& other : clients) {
-        if (other._id == client_id) continue;
-        if (ST_INGAME != other.get_state()) continue;
-        if (!is_near(client_id, other.get_id())) continue;
-
-        cl.vl.lock();
-        cl.viewlist.insert(other._id);
-        cl.vl.unlock();
-        send_move_response(client_id, GameProtocol::Direction_UP);
-
-        if (!is_npc(other._id)) {
-            clients[other._id].vl.lock();
-            clients[other._id].viewlist.insert(client_id);
-            clients[other._id].vl.unlock();
-            send_move_response(other._id, GameProtocol::Direction_UP);
-        }
-    }
+    auto pPacket = Packet::New(client_id, CS_RANDOM_TELEPORT_REQUEST, fb_data, fb_size);
+    g_GameService.Push(pPacket);
+    // 실제 로직은 GameService::Handle_RandomTeleport 으로 이관
 }
 
 // -----------------------------------------------------------------------
@@ -926,6 +631,16 @@ int main()
     Initialize_NPC();
     Initialize_obstacle();
     RegisterAllHandlers();
+
+    // -----------------------------------------------------------------------
+    // 서비스 초기화 (FSCore Service 패턴 적용)
+    // -----------------------------------------------------------------------
+    g_DBService.SetGameService(&g_GameService);    // GameDBService -> GameService 참조
+    g_GameService.SetDBService(&g_DBService);      // GameService -> GameDBService 참조
+    g_DBService.StartThread();                     // DB 처리 스레드 시작
+    g_GameService.StartThread();                   // 게임 로직 스레드 시작
+    cout << "[Service] GameService & GameDBService threads started" << endl;
+
     cout << "NPC initialize fin" << endl;
     wcout.imbue(locale("korean"));
 
