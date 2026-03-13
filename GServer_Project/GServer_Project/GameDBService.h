@@ -1,6 +1,7 @@
 #pragma once
 #include "InnerPacket.h"
 #include "ObjectQueue.h"
+#include "SStruct.h"
 #include "game_protocol_generated.h"
 
 #include <functional>
@@ -13,27 +14,26 @@ class GameService;
 
 // -----------------------------------------------------------------------
 // LoginInnerData
-//   GameService -> GameDBService 로그인 요청에 담기는 데이터
+//   GameService -> GameDBService 로그인 요청에 담기는 데이터.
+//   SStruct.h 의 DBPlayerData 와 짝을 이룬다.
 // -----------------------------------------------------------------------
 struct LoginInnerData : public IInnerData
 {
-    char name[20] = {};
-    explicit LoginInnerData(const char* n) { strncpy_s(name, n, sizeof(name) - 1); }
+    char name[50] = {};
+    explicit LoginInnerData(const char* n)
+    {
+        strncpy_s(name, sizeof(name), n, sizeof(name) - 1);
+    }
 };
 
 // -----------------------------------------------------------------------
 // LoginResultData
-//   GameDBService -> GameService 로그인 결과에 담기는 데이터
+//   GameDBService -> GameService 로그인 결과에 담기는 데이터.
+//   DBPlayerData 를 그대로 포함한다.
 // -----------------------------------------------------------------------
 struct LoginResultData : public IInnerData
 {
-    bool   success  = false;
-    int    x        = 0;
-    int    y        = 0;
-    int    hp       = 0;
-    int    maxhp    = 0;
-    int    exp      = 0;
-    int    level    = 0;
+    DBPlayerData data;   // success 플래그 포함
 };
 
 // -----------------------------------------------------------------------
@@ -41,13 +41,13 @@ struct LoginResultData : public IInnerData
 //   FSCore DatabaseService 패턴을 적용한 DB 전용 처리 서비스.
 //
 //   역할:
-//     - InnerPacket으로 DB 작업 요청을 수신
-//     - DB 쿼리 수행 후 결과를 InnerPacket으로 GameService에 전달
+//     - InnerPacket 으로 DB 작업 요청을 수신
+//     - DB 쿼리 수행 후 결과를 InnerPacket 으로 GameService 에 전달
 //
 //   흐름:
 //     GameService -> Push(InnerPacket)
-//       -> GameDBService 스레드: RegisterHandler로 등록된 핸들러 호출
-//         -> DB 쿼리 수행
+//       -> GameDBService 스레드: RegisterHandler 로 등록된 핸들러 호출
+//         -> DB 쿼리 수행 (Load_DB → DBPlayerData)
 //           -> GameService.InnerPush(InnerPacket) 결과 전달
 // -----------------------------------------------------------------------
 class GameDBService

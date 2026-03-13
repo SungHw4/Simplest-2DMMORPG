@@ -1,5 +1,3 @@
-#pragma once
-
 #include "stdafx.h"
 #include "DataBase.h"
 #include "GameService.h"
@@ -18,14 +16,6 @@ GameService    g_GameService;
 GameDBService  g_DBService;
 
 BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
-
-extern SQLINTEGER p_id;
-extern SQLINTEGER p_x;
-extern SQLINTEGER p_y;
-extern SQLINTEGER p_hp;
-extern SQLINTEGER p_maxhp;
-extern SQLINTEGER p_exp;
-extern SQLINTEGER p_lv;
 
 concurrency::concurrent_priority_queue<timer_event> timer_queue;
 
