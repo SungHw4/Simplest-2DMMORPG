@@ -12,9 +12,16 @@
 #include <mutex>
 #include <functional>
 #include <unordered_set>
+#include <unordered_map>
+#include <deque>
+#include <memory>
+#include <chrono>
 #include <concurrent_priority_queue.h>
 
 #include "game_protocol_generated.h"
+#include "Packet.h"
+#include "ObjectQueue.h"
+#include "InnerPacket.h"
 
 extern "C" {
 #include "include/lua.h"
@@ -26,6 +33,7 @@ extern "C" {
 #pragma comment (lib, "WS2_32.LIB")
 #pragma comment (lib, "MSWSock.LIB")
 
+#define SafeDelete(x)   if (x != nullptr) { delete x; x = nullptr; }
 #define NAME_LEN 50 
 
 const int BUFSIZE = 256;

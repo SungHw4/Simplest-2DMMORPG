@@ -1,0 +1,142 @@
+#pragma once
+#include "InnerPacket.h"
+#include "ObjectQueue.h"
+#include "game_protocol_generated.h"
+
+#include <functional>
+#include <unordered_map>
+#include <deque>
+#include <thread>
+
+// 전방 선언
+class GameService;
+
+// -----------------------------------------------------------------------
+// LoginInnerData
+//   GameService -> GameDBService 로그인 요청에 담기는 데이터
+// -----------------------------------------------------------------------
+struct LoginInnerData : public IInnerData
+{
+    char name[20] = {};
+    explicit LoginInnerData(const char* n) { strncpy_s(name, n, sizeof(name) - 1); }
+};
+
+// -----------------------------------------------------------------------
+// LoginResultData
+//   GameDBService -> GameService 로그인 결과에 담기는 데이터
+// -----------------------------------------------------------------------
+struct LoginResultData : public IInnerData
+{
+    bool   success  = false;
+    int    x        = 0;
+    int    y        = 0;
+    int    hp       = 0;
+    int    maxhp    = 0;
+    int    exp      = 0;
+    int    level    = 0;
+};
+
+// -----------------------------------------------------------------------
+// GameDBService
+//   FSCore DatabaseService 패턴을 적용한 DB 전용 처리 서비스.
+//
+//   역할:
+//     - InnerPacket으로 DB 작업 요청을 수신
+//     - DB 쿼리 수행 후 결과를 InnerPacket으로 GameService에 전달
+//
+//   흐름:
+//     GameService -> Push(InnerPacket)
+//       -> GameDBService 스레드: RegisterHandler로 등록된 핸들러 호출
+//         -> DB 쿼리 수행
+//           -> GameService.InnerPush(InnerPacket) 결과 전달
+// -----------------------------------------------------------------------
+class GameDBService
+{
+public:
+    GameDBService();
+    ~GameDBService() { Exit(); }
+
+    void SetGameService(GameService* pGameService) { mpGameService = pGameService; }
+
+    // InnerPacket 작업 요청 Push
+    void Push(InnerPacket::SharedPtr pInner)
+    {
+        if (pInner != nullptr)
+            mWorkQueue.Push(pInner);
+    }
+
+    void StartThread()
+    {
+        mThread = std::thread([this]() { Run(); });
+    }
+
+    void Exit()
+    {
+        mShouldExit = true;
+        if (mThread.joinable())
+            mThread.join();
+    }
+
+    size_t GetWorkQueueCount() { return mWorkQueue.Count(); }
+
+private:
+    void Run()
+    {
+        while (!mShouldExit)
+        {
+            _WorkProcess();
+        }
+    }
+
+    void _WorkProcess()
+    {
+        mWorkList.clear();
+        mWorkQueue.Swap(mWorkList);
+
+        for (auto& pInner : mWorkList)
+        {
+            if (auto it = mHandlers.find(pInner->Protocol); it != mHandlers.end())
+            {
+                if (it->second != nullptr)
+                    it->second(pInner);
+            }
+        }
+
+        if (mWorkList.empty())
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+
+    // -----------------------------------------------------------------------
+    // RegisterHandler<Derived>(EInnerProtocol, 멤버함수포인터)
+    //   DB 작업 핸들러 등록 (FSCore DatabaseService 패턴 동일)
+    // -----------------------------------------------------------------------
+    template <typename DerivedType,
+        typename = typename std::enable_if<std::is_base_of<GameDBService, DerivedType>::value>::type>
+    void RegisterHandler(EInnerProtocol protocol, bool (DerivedType::* handler)(InnerPacket::SharedPtr))
+    {
+        DerivedType* derived = static_cast<DerivedType*>(this);
+        int id = static_cast<int>(protocol);
+
+        auto invoker = [derived, handler](InnerPacket::SharedPtr pkt) -> bool {
+            if (pkt == nullptr) return false;
+            return (derived->*handler)(pkt);
+        };
+
+        mHandlers.insert_or_assign(id, invoker);
+    }
+
+    // -----------------------------------------------------------------------
+    // DB 작업 핸들러
+    // -----------------------------------------------------------------------
+    bool Handle_LoginRequest(InnerPacket::SharedPtr pInner);
+
+private:
+    GameService* mpGameService = nullptr;
+
+    bool        mShouldExit = false;
+    std::thread mThread;
+
+    ObjectQueue<InnerPacket::SharedPtr>                              mWorkQueue;
+    std::unordered_map<int, std::function<bool(InnerPacket::SharedPtr)>> mHandlers;
+    std::deque<InnerPacket::SharedPtr>                               mWorkList;
+};
