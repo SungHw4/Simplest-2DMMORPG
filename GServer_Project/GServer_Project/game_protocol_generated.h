@@ -45,6 +45,9 @@ struct SCPlayerChattingResponseBuilder;
 struct CSRandomTeleportRequest;
 struct CSRandomTeleportRequestBuilder;
 
+struct SCIntegrationErrorNotification;
+struct SCIntegrationErrorNotificationBuilder;
+
 enum EPacketProtocol : int32_t {
   EPacketProtocol_CS_LoginRequest = 101,
   EPacketProtocol_SDB_LoginRequest = 102,
@@ -59,12 +62,13 @@ enum EPacketProtocol : int32_t {
   EPacketProtocol_CS_PlayerChattingRequest = 301,
   EPacketProtocol_SC_PlayerChattingResponse = 302,
   EPacketProtocol_CS_RandomTeleportRequest = 401,
-  EPacketProtocol_Max = 402,
+  EPacketProtocol_SC_IntegrationErrorNotification = 500,
+  EPacketProtocol_Max = 501,
   EPacketProtocol_MIN = EPacketProtocol_CS_LoginRequest,
   EPacketProtocol_MAX = EPacketProtocol_Max
 };
 
-inline const EPacketProtocol (&EnumValuesEPacketProtocol())[14] {
+inline const EPacketProtocol (&EnumValuesEPacketProtocol())[15] {
   static const EPacketProtocol values[] = {
     EPacketProtocol_CS_LoginRequest,
     EPacketProtocol_SDB_LoginRequest,
@@ -79,6 +83,7 @@ inline const EPacketProtocol (&EnumValuesEPacketProtocol())[14] {
     EPacketProtocol_CS_PlayerChattingRequest,
     EPacketProtocol_SC_PlayerChattingResponse,
     EPacketProtocol_CS_RandomTeleportRequest,
+    EPacketProtocol_SC_IntegrationErrorNotification,
     EPacketProtocol_Max
   };
   return values;
@@ -99,6 +104,7 @@ inline const char *EnumNameEPacketProtocol(EPacketProtocol e) {
     case EPacketProtocol_CS_PlayerChattingRequest: return "CS_PlayerChattingRequest";
     case EPacketProtocol_SC_PlayerChattingResponse: return "SC_PlayerChattingResponse";
     case EPacketProtocol_CS_RandomTeleportRequest: return "CS_RandomTeleportRequest";
+    case EPacketProtocol_SC_IntegrationErrorNotification: return "SC_IntegrationErrorNotification";
     case EPacketProtocol_Max: return "Max";
     default: return "";
   }
@@ -752,6 +758,63 @@ inline ::flatbuffers::Offset<CSRandomTeleportRequest> CreateCSRandomTeleportRequ
     GameProtocol::EPacketProtocol messegeid = GameProtocol::EPacketProtocol_CS_RandomTeleportRequest) {
   CSRandomTeleportRequestBuilder builder_(_fbb);
   builder_.add_messegeid(messegeid);
+  return builder_.Finish();
+}
+
+// -----------------------------------------------------------------------
+// SCIntegrationErrorNotification
+//   에러 발생 시 클라이언트에게 전송하는 통합 에러 알림 패킷.
+//   messageid : 에러가 발생한 원래 요청 패킷의 EPacketProtocol ID
+//   errorcode : EErrorMsg 값
+// -----------------------------------------------------------------------
+struct SCIntegrationErrorNotification FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
+  typedef SCIntegrationErrorNotificationBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_MESSAGEID  = 4,
+    VT_ERRORCODE  = 6
+  };
+  int32_t messageid() const {
+    return GetField<int32_t>(VT_MESSAGEID, 0);
+  }
+  int32_t errorcode() const {
+    return GetField<int32_t>(VT_ERRORCODE, 0);
+  }
+  bool Verify(::flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<int32_t>(verifier, VT_MESSAGEID, 4) &&
+           VerifyField<int32_t>(verifier, VT_ERRORCODE, 4) &&
+           verifier.EndTable();
+  }
+};
+
+struct SCIntegrationErrorNotificationBuilder {
+  typedef SCIntegrationErrorNotification Table;
+  ::flatbuffers::FlatBufferBuilder &fbb_;
+  ::flatbuffers::uoffset_t start_;
+  void add_messageid(int32_t messageid) {
+    fbb_.AddElement<int32_t>(SCIntegrationErrorNotification::VT_MESSAGEID, messageid, 0);
+  }
+  void add_errorcode(int32_t errorcode) {
+    fbb_.AddElement<int32_t>(SCIntegrationErrorNotification::VT_ERRORCODE, errorcode, 0);
+  }
+  explicit SCIntegrationErrorNotificationBuilder(::flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  ::flatbuffers::Offset<SCIntegrationErrorNotification> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = ::flatbuffers::Offset<SCIntegrationErrorNotification>(end);
+    return o;
+  }
+};
+
+inline ::flatbuffers::Offset<SCIntegrationErrorNotification> CreateSCIntegrationErrorNotification(
+    ::flatbuffers::FlatBufferBuilder &_fbb,
+    int32_t messageid = 0,
+    int32_t errorcode = 0) {
+  SCIntegrationErrorNotificationBuilder builder_(_fbb);
+  builder_.add_errorcode(errorcode);
+  builder_.add_messageid(messageid);
   return builder_.Finish();
 }
 

@@ -3,12 +3,11 @@
 #include "GameDBService.h"
 
 // -----------------------------------------------------------------------
-// 생성자: FSCore Service 패턴과 동일하게 RegisterHandler로 핸들러 등록
+// 생성자: FSCore Service 패턴과 동일하게 RegisterHandler 로 핸들러 등록
 // -----------------------------------------------------------------------
 GameService::GameService()
 {
     // CS 패킷 핸들러 등록
-    // FSCore의 RegisterHandler<DerivedType, MessageType>(멤버함수포인터) 패턴
     RegisterHandler<GameService, GameProtocol::CSLogin>
         (&GameService::Handle_Login);
     RegisterHandler<GameService, GameProtocol::CSPlayerMoveRequest>
@@ -26,50 +25,52 @@ GameService::GameService()
 }
 
 // -----------------------------------------------------------------------
-// 유틸리티
+// _SendFB
 // -----------------------------------------------------------------------
 void GameService::_SendFB(int clientID, std::vector<uint8_t>& framed)
 {
     clients[clientID].do_send(static_cast<int>(framed.size()), framed.data());
 }
 
-void GameService::_SendNak_Move(int clientID, GameProtocol::EErrorMsg err)
+// -----------------------------------------------------------------------
+// _SendError
+//   에러 발생 시 해당 클라이언트에게 SCIntegrationErrorNotification(500) 전송.
+//   모든 핸들러의 SendNak 람다가 이 함수 하나로 통합된다.
+//
+//   패킷 구조 (FBProtocol::BuildIntegrationError 내부):
+//     [4바이트 SC_INTEGRATION_ERROR_NOTIFICATION(500)]
+//     [SCIntegrationErrorNotification FlatBuffers]
+//       .messageid = originMsgID  (에러가 발생한 원래 요청 패킷 ID)
+//       .errorcode = err          (EErrorMsg 에러 코드)
+// -----------------------------------------------------------------------
+bool GameService::_SendError(int                           clientID,
+                              GameProtocol::EPacketProtocol originMsgID,
+                              GameProtocol::EErrorMsg        err)
 {
-    auto framed = FBProtocol::BuildMoveNak(err);
+    auto framed = FBProtocol::BuildIntegrationError(
+        static_cast<int32_t>(originMsgID),
+        err);
     _SendFB(clientID, framed);
-}
-
-void GameService::_SendNak_Attack(int clientID, GameProtocol::EErrorMsg err)
-{
-    auto framed = FBProtocol::BuildAttackNak(err);
-    _SendFB(clientID, framed);
-}
-
-void GameService::_SendNak_Chatting(int clientID, GameProtocol::EErrorMsg err)
-{
-    auto framed = FBProtocol::BuildChattingNak(err);
-    _SendFB(clientID, framed);
+    return false;
 }
 
 // -----------------------------------------------------------------------
 // Handle_Login
-//   파싱 검증 후 DB 조회를 GameDBService에 위임 (InnerPacket 사용)
+//   - 이름 검증 후 GameDBService 에 DB 조회 위임 (InnerPacket)
+//   - 에러 시: SCIntegrationErrorNotification(CS_LoginRequest, err)
 // -----------------------------------------------------------------------
 bool GameService::Handle_Login(int clientID, const GameProtocol::CSLogin& msg)
 {
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        _SendNak_Chatting(clientID, err);
-        return false;
-    };
-
     if (!msg.name() || msg.name()->size() == 0)
-        return SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+        return _SendError(clientID,
+                          GameProtocol::EPacketProtocol_CS_LoginRequest,
+                          GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
 
-    // DB 조회 요청을 InnerPacket으로 GameDBService에 Push
-    auto pInner         = std::make_shared<InnerPacket>();
-    pInner->HostID      = clientID;
-    pInner->Protocol    = static_cast<int>(EInnerProtocol::DB_LoginRequest);
-    pInner->pData       = new LoginInnerData(msg.name()->c_str());
+    // DB 조회 요청을 InnerPacket 으로 GameDBService 에 Push
+    auto pInner      = std::make_shared<InnerPacket>();
+    pInner->HostID   = clientID;
+    pInner->Protocol = static_cast<int>(EInnerProtocol::DB_LoginRequest);
+    pInner->pData    = new LoginInnerData(msg.name()->c_str());
 
     if (mpDBService != nullptr)
         mpDBService->Push(pInner);
@@ -79,55 +80,51 @@ bool GameService::Handle_Login(int clientID, const GameProtocol::CSLogin& msg)
 
 // -----------------------------------------------------------------------
 // Handle_DB_LoginResponse
-//   GameDBService 로부터 DB 조회 결과를 InnerPacket으로 수신
+//   GameDBService 로부터 DB 조회 결과를 InnerPacket 으로 수신.
+//   성공 시 클라이언트 상태를 ST_INGAME 으로 전환하고 로그인 응답 전송.
 // -----------------------------------------------------------------------
 bool GameService::Handle_DB_LoginResponse(InnerPacket::SharedPtr pInner)
 {
     int clientID = pInner->HostID;
 
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        _SendNak_Chatting(clientID, err);
-        return false;
-    };
-
     auto* pResult = dynamic_cast<LoginResultData*>(pInner->pData);
-    if (pResult == nullptr)
-        return SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+    if (pResult == nullptr || !pResult->data.success)
+        return _SendError(clientID,
+                          GameProtocol::EPacketProtocol_CS_LoginRequest,
+                          GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
 
-    if (!pResult->success)
-        return SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+    const DBPlayerData& d = pResult->data;
 
-    CLIENT& cl   = clients[clientID];
-    cl.x         = static_cast<short>(pResult->x);
-    cl.y         = static_cast<short>(pResult->y);
-    cl.level     = static_cast<short>(pResult->level);
-    cl.maxhp     = static_cast<short>(pResult->maxhp);
-    cl.hp        = static_cast<short>(pResult->hp);
-    cl.exp       = static_cast<short>(pResult->exp);
-    cl.dmg       = 10 + (pResult->level * 3);
+    CLIENT& cl  = clients[clientID];
+    cl.x        = static_cast<short>(d.x);
+    cl.y        = static_cast<short>(d.y);
+    cl.level    = static_cast<short>(d.level);
+    cl.maxhp    = static_cast<short>(d.maxhp);
+    cl.hp       = static_cast<short>(d.hp);
+    cl.exp      = static_cast<short>(d.exp);
+    cl.dmg      = 10 + (d.level * 3);
+    strncpy_s(cl.name, d.name, sizeof(cl.name) - 1);
 
     cl.state_lock.lock();
     cl._state = ST_INGAME;
     cl.state_lock.unlock();
 
-    // 로그인 성공 응답 전송
-    auto framed = FBProtocol::BuildMoveResponse(GameProtocol::Direction_UP);
+    // 로그인 성공 응답: SC_LoginResponse(104) 전송
+    auto framed = FBProtocol::BuildLoginResponse(GameProtocol::Direction_UP);
     _SendFB(clientID, framed);
 
-    cout << "[GameService] Login OK - clientID=" << clientID << endl;
+    cout << "[GameService] Login OK - clientID=" << clientID
+         << " name=" << cl.name << endl;
     return true;
 }
 
 // -----------------------------------------------------------------------
 // Handle_Move
+//   - 방향 검증 후 좌표 이동
+//   - 에러 시: SCIntegrationErrorNotification(CS_PlayerMoveRequest, err)
 // -----------------------------------------------------------------------
 bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequest& msg)
 {
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        _SendNak_Move(clientID, err);
-        return false;
-    };
-
     CLIENT& cl = clients[clientID];
     GameProtocol::Direction dir = msg.direction();
 
@@ -141,7 +138,9 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
     case 2: if (x > 0 && obs[y][x-1] == 0) x--; break;                         // LEFT
     case 3: if (x < (WORLD_WIDTH - 1) && obs[y][x+1] == 0) x++; break;         // RIGHT
     default:
-        return SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+        return _SendError(clientID,
+                          GameProtocol::EPacketProtocol_CS_PlayerMoveRequest,
+                          GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
     }
 
     cl.x = static_cast<short>(x);
@@ -170,14 +169,11 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
 
 // -----------------------------------------------------------------------
 // Handle_Attack
+//   - 시야 내 공격 범위에 있는 대상에게 데미지 적용
+//   - 에러 시: SCIntegrationErrorNotification(CS_PlayerAttackRequest, err)
 // -----------------------------------------------------------------------
 bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttackRequest& msg)
 {
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        _SendNak_Attack(clientID, err);
-        return false;
-    };
-
     CLIENT& cl = clients[clientID];
     GameProtocol::Direction dir = msg.direction();
 
@@ -197,8 +193,9 @@ bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttack
         }
     }
 
+    // 자신의 현재 상태 전송
     auto framed = FBProtocol::BuildAttackResponse(clientID, dir,
-        clients[clientID].hp, clients[clientID].exp);
+                      clients[clientID].hp, clients[clientID].exp);
     _SendFB(clientID, framed);
 
     return true;
@@ -206,16 +203,15 @@ bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttack
 
 // -----------------------------------------------------------------------
 // Handle_Chatting
+//   - 메시지 검증 후 시야 내 브로드캐스트
+//   - 에러 시: SCIntegrationErrorNotification(CS_PlayerChattingRequest, err)
 // -----------------------------------------------------------------------
 bool GameService::Handle_Chatting(int clientID, const GameProtocol::CSPlayerChattingRequest& msg)
 {
-    auto SendNak = [&](GameProtocol::EErrorMsg err) -> bool {
-        _SendNak_Chatting(clientID, err);
-        return false;
-    };
-
     if (!msg.message())
-        return SendNak(GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+        return _SendError(clientID,
+                          GameProtocol::EPacketProtocol_CS_PlayerChattingRequest,
+                          GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
 
     const char* message = msg.message()->c_str();
 
@@ -241,6 +237,8 @@ bool GameService::Handle_Chatting(int clientID, const GameProtocol::CSPlayerChat
 
 // -----------------------------------------------------------------------
 // Handle_RandomTeleport
+//   - 기존 시야 제거 후 랜덤 위치로 이동
+//   - 에러는 없으므로 _SendError 미사용
 // -----------------------------------------------------------------------
 bool GameService::Handle_RandomTeleport(int clientID, const GameProtocol::CSRandomTeleportRequest& msg)
 {
