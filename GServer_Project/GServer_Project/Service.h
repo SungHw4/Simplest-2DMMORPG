@@ -3,12 +3,55 @@
 #include "Packet.h"
 #include "ObjectQueue.h"
 #include "InnerPacket.h"
+#include "game_protocol_generated.h"
 
 #include <functional>
 #include <unordered_map>
 #include <deque>
 #include <vector>
 #include <thread>
+
+// -----------------------------------------------------------------------
+// PacketProtocolID<MessageType>
+//   각 FlatBuffers 메시지 타입에 대응하는 EPacketProtocol ID를
+//   컴파일 타임에 매핑하는 traits 구조체.
+//
+//   NativeTableType이 생성되지 않는 프로젝트(object API 미사용)에서
+//   RegisterHandler 가 프로토콜 ID를 자동 추출할 때 사용한다.
+//
+//   새 패킷 타입을 추가하면 이 곳에도 특수화를 추가한다.
+// -----------------------------------------------------------------------
+template<typename T>
+struct PacketProtocolID
+{
+    // 특수화되지 않은 타입은 컴파일 에러를 내서 누락을 방지한다.
+    static_assert(sizeof(T) == 0,
+        "[PacketProtocolID] 이 메시지 타입의 특수화가 없습니다. "
+        "Service.h 의 PacketProtocolID 에 특수화를 추가하세요.");
+    static constexpr int value = 0;
+};
+
+// CS 패킷
+template<> struct PacketProtocolID<GameProtocol::CSLogin>
+    { static constexpr int value = 101; };
+template<> struct PacketProtocolID<GameProtocol::CSPlayerMoveRequest>
+    { static constexpr int value = 201; };
+template<> struct PacketProtocolID<GameProtocol::CSPlayerAttackRequest>
+    { static constexpr int value = 205; };
+template<> struct PacketProtocolID<GameProtocol::CSPlayerChattingRequest>
+    { static constexpr int value = 301; };
+template<> struct PacketProtocolID<GameProtocol::CSRandomTeleportRequest>
+    { static constexpr int value = 401; };
+
+// SC 패킷 (서버 → 클라이언트, 필요 시 사용)
+template<> struct PacketProtocolID<GameProtocol::SCPlayerMoveResponse>
+    { static constexpr int value = 202; };
+template<> struct PacketProtocolID<GameProtocol::SCPlayerAttackResponse>
+    { static constexpr int value = 206; };
+template<> struct PacketProtocolID<GameProtocol::SCPlayerChattingResponse>
+    { static constexpr int value = 302; };
+template<> struct PacketProtocolID<GameProtocol::SCIntegrationErrorNotification>
+    { static constexpr int value = 500; };
 
 // -----------------------------------------------------------------------
 // Service (FSCore의 Service 패턴 적용)
@@ -21,8 +64,8 @@
 // 사용 방법:
 //   class GameService : public Service { ... };
 //   GameService::GameService() {
-//       RegisterHandler(&GameService::Handle_MoveRequest);
-//       RegisterHandler(&GameService::Handle_AttackRequest);
+//       RegisterHandler<GameService, GameProtocol::CSPlayerMoveRequest>
+//           (&GameService::Handle_Move);
 //   }
 // -----------------------------------------------------------------------
 class Service
@@ -86,8 +129,8 @@ public:
 protected:
     // -----------------------------------------------------------------------
     // RegisterHandler<Derived, MessageType>(멤버함수포인터)
-    //   FSCore Service 와 동일한 템플릿 등록 방식.
-    //   MessageType::NativeTableType().messageid 로 프로토콜 ID 를 자동 추출.
+    //   PacketProtocolID<MessageType>::value 로 프로토콜 ID 를 컴파일 타임에 추출.
+    //   NativeTableType 없이도 동작하는 방식.
     //
     //   핸들러 시그니처: bool Derived::Handle_Xxx(int hostID, const MessageType& msg)
     // -----------------------------------------------------------------------
@@ -96,7 +139,9 @@ protected:
     void RegisterHandler(bool (DerivedType::* handler)(int, const MessageType&))
     {
         DerivedType* derived = static_cast<DerivedType*>(this);
-        int id = static_cast<int>(typename MessageType::NativeTableType().messageid);
+
+        // NativeTableType 대신 PacketProtocolID traits 로 ID 추출
+        constexpr int id = PacketProtocolID<MessageType>::value;
 
         auto invoker = [derived, handler](const Packet& packet) -> bool {
             auto msg = flatbuffers::GetRoot<MessageType>(packet.GetDataPtr());
