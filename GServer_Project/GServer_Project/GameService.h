@@ -9,6 +9,13 @@ class GameDBService;
 extern array<CLIENT, MAX_USER + MAX_NPC> clients;
 extern BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 
+// 2021g_Server.cpp 에 정의된 유틸리티 함수 선언
+// GameService.cpp 에서 is_player / is_npc / is_attack_range 를 사용하므로
+// 링커 오류를 막기 위해 여기서 선언한다.
+bool is_player(int id);
+bool is_npc(int id);
+bool is_attack_range(int a, int b);
+
 // -----------------------------------------------------------------------
 // GameService
 //   FSCore Service 패턴을 적용한 인게임 행동 처리 서비스.
