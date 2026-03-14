@@ -3,6 +3,7 @@
 #include "game_protocol_generated.h"
 #include "protocol.h"
 #include "InnerPacket.h"
+#include "CLIENT.h"   // CLIENT 클래스 정의 — extern array<CLIENT,...> 및 is_player 등 사용에 필요
 
 #include "CLIENT.h"
 // 전방 선언
