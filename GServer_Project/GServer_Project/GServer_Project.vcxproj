@@ -155,7 +155,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="2021g_Server.cpp" />
+    <ClCompile Include="ServerMain.cpp" />
+    <ClCompile Include="Grid.cpp" />
     <ClCompile Include="CLIENT.cpp">
       <RuntimeLibrary>MultiThreadedDebugDll</RuntimeLibrary>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
@@ -236,6 +237,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="2021_Proto.h" />
+    <ClInclude Include="Grid.h" />
     <ClInclude Include="CLIENT.h" />
     <ClInclude Include="DataBase.h" />
     <ClInclude Include="enum.h" />

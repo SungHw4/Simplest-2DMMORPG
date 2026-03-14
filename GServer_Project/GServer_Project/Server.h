@@ -68,34 +68,6 @@ public:
     }
 };
 
-// ============================================================
-// [TODO: Grid System] - 나중에 적용 예정
-//
-// 목표: 전체 clients 순회(O(N)) → 인접 셀 탐색(O(k))으로 교체
-//
-// 설계안:
-//   CELL_SIZE  = 16       (타일 단위, RANGE=15 기준)
-//   GRID_W     = WORLD_WIDTH  / CELL_SIZE   = 125
-//   GRID_H     = WORLD_HEIGHT / CELL_SIZE   = 125
-//
-//   struct GridCell {
-//       mutex                  mtx;
-//       unordered_set<int>     players;   // 플레이어 ID
-//       unordered_set<int>     npcs;      // NPC ID
-//   };
-//   GridCell g_grid[GRID_H][GRID_W];
-//
-// 적용 위치:
-//   - do_npc_move()   : old/new_viewlist 수집 시 인접 셀만 탐색
-//   - handle_move()   : nearlist 수집 시 인접 셀만 탐색
-//   - Initialize_NPC(): 초기화 시 셀에 NPC 등록
-//   - Disconnect()    : 셀에서 플레이어 제거
-//
-// 적용 순서:
-//   1. GridCell 구조체 + g_grid 배열 선언
-//   2. 플레이어/NPC 이동 시 셀 이동 처리 (erase → insert)
-//   3. do_npc_move, handle_move의 순회 로직을 셀 기반으로 교체
-// ============================================================
 
 struct timer_event {
     int obj_id;

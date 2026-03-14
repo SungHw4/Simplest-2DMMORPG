@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "GameService.h"
 #include "GameDBService.h"
+#include "Grid.h"
 
 // -----------------------------------------------------------------------
 // 생성자: FSCore Service 패턴과 동일하게 RegisterHandler 로 핸들러 등록
@@ -128,8 +129,10 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
     CLIENT& cl = clients[clientID];
     GameProtocol::Direction dir = msg.direction();
 
-    int x = cl.x;
-    int y = cl.y;
+    int old_x = cl.x;
+    int old_y = cl.y;
+    int x = old_x;
+    int y = old_y;
 
     switch (static_cast<int>(dir))
     {
@@ -142,6 +145,11 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
                           GameProtocol::EPacketProtocol_CS_PlayerMoveRequest,
                           GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
     }
+
+    // 그리드 셀 이동 (셀이 바뀌는 경우에만 내부적으로 처리)
+    grid_move_player(clientID,
+                     cell_x(old_x), cell_y(old_y),
+                     cell_x(x),     cell_y(y));
 
     cl.x = static_cast<short>(x);
     cl.y = static_cast<short>(y);
@@ -244,6 +252,9 @@ bool GameService::Handle_RandomTeleport(int clientID, const GameProtocol::CSRand
 {
     CLIENT& cl = clients[clientID];
 
+    int old_x = cl.x;
+    int old_y = cl.y;
+
     cl.vl.lock();
     std::unordered_set<int> old_vl{ cl.viewlist };
     cl.viewlist.clear();
@@ -267,6 +278,11 @@ bool GameService::Handle_RandomTeleport(int clientID, const GameProtocol::CSRand
 
     cl.x = static_cast<short>(new_x);
     cl.y = static_cast<short>(new_y);
+
+    // 그리드 셀 이동
+    grid_move_player(clientID,
+                     cell_x(old_x), cell_y(old_y),
+                     cell_x(new_x), cell_y(new_y));
 
     auto framed = FBProtocol::BuildMoveResponse(GameProtocol::Direction_UP);
     _SendFB(clientID, framed);
