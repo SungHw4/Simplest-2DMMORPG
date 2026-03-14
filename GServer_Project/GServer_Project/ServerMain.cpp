@@ -2,6 +2,7 @@
 #include "DataBase.h"
 #include "GameService.h"
 #include "GameDBService.h"
+#include "Grid.h"
 
 HANDLE g_h_iocp;
 SOCKET g_s_socket;
@@ -118,6 +119,10 @@ void send_chatting_response(int c_id, int sender_id, const char* message)
 void Disconnect(int c_id)
 {
     CLIENT& cl = clients[c_id];
+
+    // 그리드에서 플레이어 제거
+    grid_remove_player(c_id, cl.x, cl.y);
+
     UpdatePlayerOnDB(c_id, clients[c_id]);
     cl.vl.lock();
     unordered_set<int> my_vl = cl.viewlist;
@@ -318,6 +323,9 @@ void worker()
                 ZeroMemory(&cl._recv_over._wsa_over, sizeof(cl._recv_over._wsa_over));
                 cl._socket = c_socket;
 
+                // 그리드에 플레이어 등록
+                grid_add_player(new_id, cl.x, cl.y);
+
                 CreateIoCompletionPort(
                     reinterpret_cast<HANDLE>(c_socket), g_h_iocp, new_id, 0);
                 cl.do_recv();
@@ -448,6 +456,9 @@ void Initialize_NPC()
         clients[i].y          = rand() % WORLD_HEIGHT;
         clients[i]._id        = i;
         clients[i]._state     = ST_INGAME;
+
+        // 그리드에 NPC 등록
+        grid_add_npc(i, clients[i].x, clients[i].y);
         clients[i]._is_active = false;
         clients[i].exp        = 100;
         clients[i].hp         = 100;
@@ -491,6 +502,9 @@ void Initialize_obstacle()
 // -----------------------------------------------------------------------
 void npcmove(int npc_id)
 {
+    int old_cx = cell_x(clients[npc_id].x);
+    int old_cy = cell_y(clients[npc_id].y);
+
     auto& x = clients[npc_id].x;
     auto& y = clients[npc_id].y;
     switch (rand() % 4) {
@@ -499,6 +513,10 @@ void npcmove(int npc_id)
     case 2: if (x > 0 && (obs[y][x-1] == 0)) x--; break;
     case 3: if (x < (WORLD_WIDTH - 1) && (obs[y][x+1] == 0)) x++; break;
     }
+
+    // 그리드 셀 이동
+    grid_move_npc(npc_id, old_cx, old_cy, cell_x(x), cell_y(y));
+
     timer_event ev;
     ev.obj_id     = npc_id;
     ev.target_id  = 0;
@@ -509,12 +527,19 @@ void npcmove(int npc_id)
 
 void do_npc_move(int npc_id, int target, std::chrono::seconds time)
 {
-    // 이동 전 시야 내 플레이어
+    // 이동 전 셀 좌표 저장
+    int old_cx = cell_x(clients[npc_id].x);
+    int old_cy = cell_y(clients[npc_id].y);
+
+    // 이동 전 시야 내 플레이어 (grid 기반 — O(~6) 셀 탐색)
     unordered_set<int> old_viewlist;
-    for (auto& obj : clients) {
-        if (obj._state != ST_INGAME)       continue;
-        if (!is_player(obj.get_id()))      continue;
-        if (is_near(npc_id, obj.get_id())) old_viewlist.insert(obj._id);
+    {
+        unordered_set<int> candidates;
+        grid_get_near_players(old_cx, old_cy, candidates);
+        for (int id : candidates) {
+            if (clients[id]._state == ST_INGAME && is_near(npc_id, id))
+                old_viewlist.insert(id);
+        }
     }
 
     // 타겟 방향으로 1칸 이동
@@ -526,12 +551,20 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
     if      (t_x != x) x += (t_x > x) ? 1 : -1;
     else if (t_y != y) y += (t_y > y) ? 1 : -1;
 
-    // 이동 후 시야 내 플레이어
+    // 이동 후 셀 좌표, 그리드 업데이트
+    int new_cx = cell_x(x);
+    int new_cy = cell_y(y);
+    grid_move_npc(npc_id, old_cx, old_cy, new_cx, new_cy);
+
+    // 이동 후 시야 내 플레이어 (grid 기반)
     unordered_set<int> new_viewlist;
-    for (auto& obj : clients) {
-        if (obj._state != ST_INGAME)       continue;
-        if (!is_player(obj.get_id()))      continue;
-        if (is_near(npc_id, obj.get_id())) new_viewlist.insert(obj.get_id());
+    {
+        unordered_set<int> candidates;
+        grid_get_near_players(new_cx, new_cy, candidates);
+        for (int id : candidates) {
+            if (clients[id]._state == ST_INGAME && is_near(npc_id, id))
+                new_viewlist.insert(id);
+        }
     }
 
     // 새로 시야에 들어온 플레이어 → put (이동 응답으로 대체)
@@ -620,6 +653,7 @@ void do_timer()
 // -----------------------------------------------------------------------
 int main()
 {
+    grid_initialize();     // Grid/Cell 공간 분할 초기화 (반드시 NPC 초기화 전)
     Initialize_DB();
     Initialize_NPC();
     Initialize_obstacle();
