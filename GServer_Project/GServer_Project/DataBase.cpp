@@ -84,6 +84,9 @@ bool Load_DB(const char* name, DBPlayerData& outData)
 {
     if (!name || name[0] == '\0') return false;
 
+    // SQL Injection 방지: 허용되지 않은 문자가 포함된 이름은 거부
+    if (!DB_Injection(name)) return false;
+
     SQLHSTMT  localStmt = nullptr;
     SQLRETURN retcode;
 
@@ -151,6 +154,9 @@ bool Load_DB(const char* name, DBPlayerData& outData)
 // -----------------------------------------------------------------------
 void UpdatePlayerOnDB(int /*c_id*/, CLIENT& client)
 {
+    // SQL Injection 방지: DB에서 로드된 이름이라도 검증
+    if (!DB_Injection(client.name)) return;
+
     SQLHSTMT  localStmt = nullptr;
     SQLRETURN retcode;
 
