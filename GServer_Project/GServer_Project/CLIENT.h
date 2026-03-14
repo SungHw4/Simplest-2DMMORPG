@@ -34,7 +34,9 @@ public:
 
     ~CLIENT()
     {
-        closesocket(_socket);
+        // ST_FREE 상태는 소켓이 유효하지 않으므로 close 하지 않음
+        if (_state != ST_FREE)
+            closesocket(_socket);
     }
 
     void do_recv();

@@ -401,7 +401,7 @@ int API_SendMessage(lua_State* L)
 int API_get_x(lua_State* L)
 {
     int user_id = (int)lua_tointeger(L, -1);
-    lua_pop(L, 2);
+    lua_pop(L, 1);  // 인자 1개만 pop
     lua_pushnumber(L, clients[user_id].x);
     return 1;
 }
@@ -409,7 +409,7 @@ int API_get_x(lua_State* L)
 int API_get_y(lua_State* L)
 {
     int user_id = (int)lua_tointeger(L, -1);
-    lua_pop(L, 2);
+    lua_pop(L, 1);  // 인자 1개만 pop
     lua_pushnumber(L, clients[user_id].y);
     return 1;
 }
@@ -463,7 +463,7 @@ void Initialize_NPC()
         lua_pushnumber(L, clients[i].x);
         lua_pushnumber(L, clients[i].y);
         lua_pcall(L, 3, 3, 0);
-        lua_pop(L, 4);
+        lua_pop(L, 3);  // set_uid 반환값 3개만 pop
 
         lua_register(L, "API_get_x",       API_get_x);
         lua_register(L, "API_get_y",       API_get_y);
@@ -575,7 +575,7 @@ void do_npc_move(int npc_id, int target, std::chrono::seconds time)
 // -----------------------------------------------------------------------
 void do_timer()
 {
-    chrono::system_clock::duration dura;
+    chrono::system_clock::duration dura = 0ms;
     const chrono::milliseconds waittime = 10ms;
     timer_event temp;
     bool temp_bool = false;
@@ -584,6 +584,7 @@ void do_timer()
             temp_bool = false;
             EXP_OVER* ex_over = new EXP_OVER;
             ex_over->_comp_op = OP_NPC_MOVE;
+            ex_over->_target  = temp.target_id;  // target_id 초기화
             PostQueuedCompletionStatus(
                 g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);
         }
@@ -597,6 +598,7 @@ void do_timer()
             if (dura <= 0ms) {
                 EXP_OVER* ex_over = new EXP_OVER;
                 ex_over->_comp_op = OP_NPC_MOVE;
+                ex_over->_target  = ev.target_id;  // target_id 초기화
                 PostQueuedCompletionStatus(
                     g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);
             } else if (dura <= waittime) {
@@ -608,7 +610,8 @@ void do_timer()
                 break;
             }
         }
-        this_thread::sleep_for(dura);
+        if (dura > 0ms)
+            this_thread::sleep_for(dura);
     }
 }
 
