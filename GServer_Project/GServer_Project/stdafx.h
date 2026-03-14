@@ -1,5 +1,7 @@
 #pragma once
+#define NOMINMAX          // Windows.h 의 min/max 매크로가 std::max/min 을 오염시키지 않도록 방지
 #include <iostream>
+#include <algorithm>      // std::max, std::min
 #include "protocol.h"
 #include "enum.h"
 #include <string>
