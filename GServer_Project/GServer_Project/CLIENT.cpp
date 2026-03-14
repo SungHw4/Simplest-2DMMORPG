@@ -55,7 +55,7 @@ STATE CLIENT::get_state()
 {
     return _state;
 }
-atomic_bool CLIENT::set_active(bool active)
+void CLIENT::set_active(bool active)
 {
     _is_active = active;
 }

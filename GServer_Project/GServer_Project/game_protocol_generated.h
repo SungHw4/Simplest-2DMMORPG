@@ -62,7 +62,7 @@ enum EPacketProtocol : int32_t {
   EPacketProtocol_CS_PlayerChattingRequest = 301,
   EPacketProtocol_SC_PlayerChattingResponse = 302,
   EPacketProtocol_CS_RandomTeleportRequest = 401,
-  EPacketProtocol_SC_IntegrationErrorNotification = 500,
+  EPacketProtocol_SCIntegrationErrorNotification = 500,
   EPacketProtocol_Max = 501,
   EPacketProtocol_MIN = EPacketProtocol_CS_LoginRequest,
   EPacketProtocol_MAX = EPacketProtocol_Max
@@ -83,7 +83,7 @@ inline const EPacketProtocol (&EnumValuesEPacketProtocol())[15] {
     EPacketProtocol_CS_PlayerChattingRequest,
     EPacketProtocol_SC_PlayerChattingResponse,
     EPacketProtocol_CS_RandomTeleportRequest,
-    EPacketProtocol_SC_IntegrationErrorNotification,
+    EPacketProtocol_SCIntegrationErrorNotification,
     EPacketProtocol_Max
   };
   return values;
@@ -104,7 +104,7 @@ inline const char *EnumNameEPacketProtocol(EPacketProtocol e) {
     case EPacketProtocol_CS_PlayerChattingRequest: return "CS_PlayerChattingRequest";
     case EPacketProtocol_SC_PlayerChattingResponse: return "SC_PlayerChattingResponse";
     case EPacketProtocol_CS_RandomTeleportRequest: return "CS_RandomTeleportRequest";
-    case EPacketProtocol_SC_IntegrationErrorNotification: return "SC_IntegrationErrorNotification";
+    case EPacketProtocol_SCIntegrationErrorNotification: return "SCIntegrationErrorNotification";
     case EPacketProtocol_Max: return "Max";
     default: return "";
   }
@@ -761,17 +761,11 @@ inline ::flatbuffers::Offset<CSRandomTeleportRequest> CreateCSRandomTeleportRequ
   return builder_.Finish();
 }
 
-// -----------------------------------------------------------------------
-// SCIntegrationErrorNotification
-//   에러 발생 시 클라이언트에게 전송하는 통합 에러 알림 패킷.
-//   messageid : 에러가 발생한 원래 요청 패킷의 EPacketProtocol ID
-//   errorcode : EErrorMsg 값
-// -----------------------------------------------------------------------
 struct SCIntegrationErrorNotification FLATBUFFERS_FINAL_CLASS : private ::flatbuffers::Table {
   typedef SCIntegrationErrorNotificationBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_MESSAGEID  = 4,
-    VT_ERRORCODE  = 6
+    VT_MESSAGEID = 4,
+    VT_ERRORCODE = 6
   };
   int32_t messageid() const {
     return GetField<int32_t>(VT_MESSAGEID, 0);

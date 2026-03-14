@@ -41,7 +41,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="2021_가을_protocol.h">
+    <ClInclude Include="2021_Proto.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="DataBase.h">

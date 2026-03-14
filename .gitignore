@@ -60,3 +60,5 @@
 *.user
 
 # End of https://www.toptal.com/developers/gitignore/api/c++
+/.claude
+/GServer_Project/GServer_Project/x64

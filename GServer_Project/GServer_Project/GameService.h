@@ -4,6 +4,7 @@
 #include "protocol.h"
 #include "InnerPacket.h"
 
+#include "CLIENT.h"
 // 전방 선언
 class GameDBService;
 extern array<CLIENT, MAX_USER + MAX_NPC> clients;

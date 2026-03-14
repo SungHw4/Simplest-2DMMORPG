@@ -46,5 +46,5 @@ public:
     void set_level(short level);
     int get_id();
     STATE get_state();
-    atomic_bool set_active(bool active);
+    void set_active(bool active);
 };

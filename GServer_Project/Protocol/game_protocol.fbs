@@ -27,6 +27,9 @@ enum EPacketProtocol : int
 
   CS_RandomTeleportRequest  = 401,	//더미 동접 테스트용 랜덤 텔포
 
+
+  SCIntegrationErrorNotification = 500,
+
   Max
 }
 
@@ -103,4 +106,9 @@ table SCPlayerChattingResponse {
 
   table CSRandomTeleportRequest {
   messegeid:EPacketProtocol = CS_RandomTeleportRequest;
+  }
+
+  table SCIntegrationErrorNotification {
+  messageid:int;
+  errorcode:int;
   }
