@@ -38,6 +38,8 @@
 *.la
 *.a
 *.lib
+# 단, 프로젝트에 직접 포함된 서드파티 라이브러리는 예외
+!**/lib/*.lib
 
 # Executables
 *.exe
