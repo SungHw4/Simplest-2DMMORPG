@@ -39,6 +39,13 @@ bool GameDBService::Handle_LoginRequest(InnerPacket::SharedPtr pInner)
     DBPlayerData dbData;
     bool dbResult = Load_DB(pLoginData->name, dbData);
 
+    // 플레이어가 존재하지 않으면 기본값으로 신규 생성 후 재조회
+    if (!dbResult) {
+        char empty_pwd[] = "";
+        Add_DB(pLoginData->name, empty_pwd);
+        dbResult = Load_DB(pLoginData->name, dbData);
+    }
+
     // -----------------------------------------------------------------------
     // 결과 InnerPacket 생성 후 GameService 에 Push
     // -----------------------------------------------------------------------

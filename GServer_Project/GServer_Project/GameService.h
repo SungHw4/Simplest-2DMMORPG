@@ -3,20 +3,19 @@
 #include "game_protocol_generated.h"
 #include "protocol.h"
 #include "InnerPacket.h"
-#include "CLIENT.h"   // CLIENT 클래스 정의 — extern array<CLIENT,...> 및 is_player 등 사용에 필요
-
 #include "CLIENT.h"
+
 // 전방 선언
 class GameDBService;
 extern array<CLIENT, MAX_USER + MAX_NPC> clients;
 extern BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 
-// 2021g_Server.cpp 에 정의된 유틸리티 함수 선언
-// GameService.cpp 에서 is_player / is_npc / is_attack_range 를 사용하므로
-// 링커 오류를 막기 위해 여기서 선언한다.
+// ServerMain.cpp 에 정의된 유틸리티 함수 선언
 bool is_player(int id);
 bool is_npc(int id);
+bool is_near(int a, int b);
 bool is_attack_range(int a, int b);
+void lock_two_viewlists(int id1, int id2, std::function<void()> callback);
 
 // -----------------------------------------------------------------------
 // GameService
