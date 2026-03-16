@@ -118,6 +118,9 @@ void send_chatting_response(int c_id, int sender_id, const char* message)
 // -----------------------------------------------------------------------
 void Disconnect(int c_id)
 {
+    // NPC는 Disconnect 대상이 아님
+    if (!is_player(c_id)) return;
+
     CLIENT& cl = clients[c_id];
 
     // 그리드에서 플레이어 제거
@@ -351,6 +354,8 @@ void worker()
             clients[client_id].state_lock.unlock();
 
             if (exp_over->_target == -1) {
+                // 랜덤 방랑 이벤트: npcmove를 재호출하여 방랑 사이클 유지
+                npcmove(client_id);
                 delete exp_over;
                 break;
             }
@@ -505,6 +510,16 @@ void npcmove(int npc_id)
     int old_cx = cell_x(clients[npc_id].x);
     int old_cy = cell_y(clients[npc_id].y);
 
+    // 이동 전 시야 내 플레이어 수집
+    unordered_set<int> old_near;
+    {
+        unordered_set<int> cands;
+        grid_get_near_players(old_cx, old_cy, cands);
+        for (int id : cands)
+            if (clients[id]._state == ST_INGAME && is_near(npc_id, id))
+                old_near.insert(id);
+    }
+
     auto& x = clients[npc_id].x;
     auto& y = clients[npc_id].y;
     switch (rand() % 4) {
@@ -514,12 +529,43 @@ void npcmove(int npc_id)
     case 3: if (x < (WORLD_WIDTH - 1) && (obs[y][x+1] == 0)) x++; break;
     }
 
-    // 그리드 셀 이동
-    grid_move_npc(npc_id, old_cx, old_cy, cell_x(x), cell_y(y));
+    int new_cx = cell_x(x), new_cy = cell_y(y);
+    grid_move_npc(npc_id, old_cx, old_cy, new_cx, new_cy);
 
+    // 이동 후 시야 내 플레이어 수집
+    unordered_set<int> new_near;
+    {
+        unordered_set<int> cands;
+        grid_get_near_players(new_cx, new_cy, cands);
+        for (int id : cands)
+            if (clients[id]._state == ST_INGAME && is_near(npc_id, id))
+                new_near.insert(id);
+    }
+
+    // 시야 진입 → viewlist 등록 + 이동 알림
+    for (int pl : new_near) {
+        if (old_near.count(pl) == 0) {
+            clients[pl].vl.lock();
+            clients[pl].viewlist.insert(npc_id);
+            clients[pl].vl.unlock();
+        }
+        send_move_response(pl, GameProtocol::Direction_UP);
+    }
+
+    // 시야 이탈 → viewlist 제거
+    for (int pl : old_near) {
+        if (new_near.count(pl) == 0) {
+            clients[pl].vl.lock();
+            clients[pl].viewlist.erase(npc_id);
+            clients[pl].vl.unlock();
+        }
+    }
+
+    // target_id = -1: 플레이어를 추적하는 것이 아닌 랜덤 방랑 이벤트임을 표시
+    // worker 스레드에서 -1을 받으면 npcmove를 재호출하여 방랑 사이클을 유지한다.
     timer_event ev;
     ev.obj_id     = npc_id;
-    ev.target_id  = 0;
+    ev.target_id  = -1;
     ev.start_time = chrono::system_clock::now() + 1s;
     ev.ev         = EVENT_NPC_MOVE;
     timer_queue.push(ev);

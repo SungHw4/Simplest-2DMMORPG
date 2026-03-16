@@ -62,6 +62,12 @@ bool GameService::_SendError(int                           clientID,
 // -----------------------------------------------------------------------
 bool GameService::Handle_Login(int clientID, const GameProtocol::CSLogin& msg)
 {
+    // 이미 인게임 상태면 중복 로그인 거부
+    if (clients[clientID]._state == ST_INGAME)
+        return _SendError(clientID,
+                          GameProtocol::EPacketProtocol_CS_LoginRequest,
+                          GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
+
     if (!msg.name() || msg.name()->size() == 0)
         return _SendError(clientID,
                           GameProtocol::EPacketProtocol_CS_LoginRequest,
@@ -97,6 +103,10 @@ bool GameService::Handle_DB_LoginResponse(InnerPacket::SharedPtr pInner)
     const DBPlayerData& d = pResult->data;
 
     CLIENT& cl  = clients[clientID];
+
+    // OP_ACCEPT에서 임시 랜덤 위치로 그리드에 등록됐으므로 DB 위치로 갱신
+    int old_cx = cell_x(cl.x), old_cy = cell_y(cl.y);
+
     cl.x        = static_cast<short>(d.x);
     cl.y        = static_cast<short>(d.y);
     cl.level    = static_cast<short>(d.level);
@@ -105,6 +115,8 @@ bool GameService::Handle_DB_LoginResponse(InnerPacket::SharedPtr pInner)
     cl.exp      = static_cast<short>(d.exp);
     cl.dmg      = 10 + (d.level * 3);
     strncpy_s(cl.name, d.name, sizeof(cl.name) - 1);
+
+    grid_move_player(clientID, old_cx, old_cy, cell_x(cl.x), cell_y(cl.y));
 
     cl.state_lock.lock();
     cl._state = ST_INGAME;
@@ -146,30 +158,60 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
                           GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
     }
 
-    // 그리드 셀 이동 (셀이 바뀌는 경우에만 내부적으로 처리)
-    grid_move_player(clientID,
-                     cell_x(old_x), cell_y(old_y),
-                     cell_x(x),     cell_y(y));
+    int old_cx = cell_x(old_x), old_cy = cell_y(old_y);
+    int new_cx = cell_x(x),     new_cy = cell_y(y);
 
+    // 이동 전 시야 내 플레이어 수집 (이동 전 좌표 기준으로 is_near 계산)
+    std::unordered_set<int> old_near;
+    {
+        std::unordered_set<int> cands;
+        grid_get_near_players(old_cx, old_cy, cands, clientID);
+        for (int id : cands)
+            if (is_player(id) && clients[id]._state == ST_INGAME && is_near(clientID, id))
+                old_near.insert(id);
+    }
+
+    // 그리드 셀 이동 + 좌표 갱신
+    grid_move_player(clientID, old_cx, old_cy, new_cx, new_cy);
     cl.x = static_cast<short>(x);
     cl.y = static_cast<short>(y);
+
+    // 이동 후 시야 내 플레이어 수집 (이동 후 좌표 기준으로 is_near 계산)
+    std::unordered_set<int> new_near;
+    {
+        std::unordered_set<int> cands;
+        grid_get_near_players(new_cx, new_cy, cands, clientID);
+        for (int id : cands)
+            if (is_player(id) && clients[id]._state == ST_INGAME && is_near(clientID, id))
+                new_near.insert(id);
+    }
 
     // 자신에게 이동 결과 전송
     auto framed = FBProtocol::BuildMoveResponse(dir);
     _SendFB(clientID, framed);
 
-    // 시야 내 다른 플레이어에게 브로드캐스트
-    cl.vl.lock();
-    std::unordered_set<int> my_vl{ cl.viewlist };
-    cl.vl.unlock();
+    // 새로 시야에 들어온 플레이어 → 서로 viewlist 등록
+    for (int other : new_near) {
+        if (old_near.count(other)) continue;
+        lock_two_viewlists(clientID, other, [&]() {
+            cl.viewlist.insert(other);
+            clients[other].viewlist.insert(clientID);
+        });
+    }
 
-    for (auto other : my_vl)
-    {
-        if (is_player(other))
-        {
-            auto f = FBProtocol::BuildMoveResponse(dir);
-            clients[other].do_send(static_cast<int>(f.size()), f.data());
-        }
+    // 시야에서 벗어난 플레이어 → 서로 viewlist 제거
+    for (int other : old_near) {
+        if (new_near.count(other)) continue;
+        lock_two_viewlists(clientID, other, [&]() {
+            cl.viewlist.erase(other);
+            clients[other].viewlist.erase(clientID);
+        });
+    }
+
+    // 시야 내 전체 플레이어에게 이동 알림 (신규 진입 + 기존 모두)
+    for (int other : new_near) {
+        auto f = FBProtocol::BuildMoveResponse(dir);
+        clients[other].do_send(static_cast<int>(f.size()), f.data());
     }
 
     return true;
