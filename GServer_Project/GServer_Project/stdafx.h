@@ -24,7 +24,6 @@
 #include "Packet.h"
 #include "ObjectQueue.h"
 #include "InnerPacket.h"
-
 extern "C" {
 #include "include/lua.h"
 #include "include/lauxlib.h"

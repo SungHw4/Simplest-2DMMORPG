@@ -3,6 +3,7 @@
 #include "GameService.h"
 #include "GameDBService.h"
 #include "Grid.h"
+#include "ExpOverPool.h"
 
 HANDLE g_h_iocp;
 SOCKET g_s_socket;
@@ -152,7 +153,8 @@ void Disconnect(int c_id)
 
 void Activate_Player_Move_Event(int target, int player_id)
 {
-    EXP_OVER* exp_over = new EXP_OVER;
+    EXP_OVER* exp_over = g_ExpOverPool.Acquire();
+    ZeroMemory(&exp_over->_wsa_over, sizeof(exp_over->_wsa_over));
     exp_over->_comp_op = OP_PLAYER_MOVE;
     exp_over->_target  = player_id;
     PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
@@ -160,7 +162,8 @@ void Activate_Player_Move_Event(int target, int player_id)
 
 void Activate_NPC_Move_Event(int target, int player_id)
 {
-    EXP_OVER* exp_over = new EXP_OVER;
+    EXP_OVER* exp_over = g_ExpOverPool.Acquire();
+    ZeroMemory(&exp_over->_wsa_over, sizeof(exp_over->_wsa_over));
     exp_over->_comp_op = OP_NPC_MOVE;
     exp_over->_target  = player_id;
     PostQueuedCompletionStatus(g_h_iocp, 1, target, &exp_over->_wsa_over);
@@ -254,7 +257,7 @@ void worker()
             cout << endl;
             Disconnect(client_id);
             if (exp_over->_comp_op == OP_SEND)
-                delete exp_over;
+                g_ExpOverPool.Release(exp_over);
             continue;
         }
 
@@ -305,7 +308,7 @@ void worker()
             if (num_byte != exp_over->_wsa_buf.len) {
                 Disconnect(client_id);
             }
-            delete exp_over;
+            g_ExpOverPool.Release(exp_over);
             break;
         }
         case OP_ACCEPT: {
@@ -348,7 +351,7 @@ void worker()
             if (clients[client_id].get_state() != ST_INGAME) {
                 clients[client_id].state_lock.unlock();
                 clients[client_id].set_active(false);
-                delete exp_over;
+                g_ExpOverPool.Release(exp_over);
                 break;
             }
             clients[client_id].state_lock.unlock();
@@ -356,7 +359,7 @@ void worker()
             if (exp_over->_target == -1) {
                 // 랜덤 방랑 이벤트: npcmove를 재호출하여 방랑 사이클 유지
                 npcmove(client_id);
-                delete exp_over;
+                g_ExpOverPool.Release(exp_over);
                 break;
             }
 
@@ -370,7 +373,7 @@ void worker()
                      << lua_tostring(L, -1) << endl;
                 lua_pop(L, 1);
                 clients[client_id].Lua_Lock.unlock();
-                delete exp_over;
+                g_ExpOverPool.Release(exp_over);
                 break;
             }
             bool should_move = lua_toboolean(L, -1);
@@ -378,7 +381,7 @@ void worker()
             clients[client_id].Lua_Lock.unlock();
 
             if (should_move) do_npc_move(client_id, exp_over->_target);
-            delete exp_over;
+            g_ExpOverPool.Release(exp_over);
             break;
         }
         case OP_PLAYER_MOVE: {
@@ -391,7 +394,7 @@ void worker()
                 cout << lua_tostring(L, -1) << endl;
             }
             clients[client_id].Lua_Lock.unlock();
-            delete exp_over;
+            g_ExpOverPool.Release(exp_over);
             break;
         }
         }
@@ -661,9 +664,10 @@ void do_timer()
     while (true) {
         if (temp_bool) {
             temp_bool = false;
-            EXP_OVER* ex_over = new EXP_OVER;
+            EXP_OVER* ex_over = g_ExpOverPool.Acquire();
+            ZeroMemory(&ex_over->_wsa_over, sizeof(ex_over->_wsa_over));
             ex_over->_comp_op = OP_NPC_MOVE;
-            ex_over->_target  = temp.target_id;  // target_id 초기화
+            ex_over->_target  = temp.target_id;
             PostQueuedCompletionStatus(
                 g_h_iocp, 1, temp.obj_id, &ex_over->_wsa_over);
         }
@@ -675,9 +679,10 @@ void do_timer()
 
             dura = ev.start_time - chrono::system_clock::now();
             if (dura <= 0ms) {
-                EXP_OVER* ex_over = new EXP_OVER;
+                EXP_OVER* ex_over = g_ExpOverPool.Acquire();
+                ZeroMemory(&ex_over->_wsa_over, sizeof(ex_over->_wsa_over));
                 ex_over->_comp_op = OP_NPC_MOVE;
-                ex_over->_target  = ev.target_id;  // target_id 초기화
+                ex_over->_target  = ev.target_id;
                 PostQueuedCompletionStatus(
                     g_h_iocp, 1, ev.obj_id, &ex_over->_wsa_over);
             } else if (dura <= waittime) {
@@ -704,6 +709,9 @@ int main()
     Initialize_NPC();
     Initialize_obstacle();
     RegisterAllHandlers();
+
+    constexpr size_t POOL_SIZE = 5000 * 30 * 2;
+	g_ExpOverPool.Init(POOL_SIZE);
 
     // -----------------------------------------------------------------------
     // 서비스 초기화 (FSCore Service 패턴 적용)
