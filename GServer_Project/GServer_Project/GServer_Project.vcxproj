@@ -237,7 +237,6 @@
     <ClCompile Include="Server.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="2021_Proto.h" />
     <ClInclude Include="ExpOverPool.h" />
     <ClInclude Include="Grid.h" />
     <ClInclude Include="CLIENT.h" />
