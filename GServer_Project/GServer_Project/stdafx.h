@@ -18,6 +18,7 @@
 #include <deque>
 #include <memory>
 #include <chrono>
+#include <sstream>
 #include <concurrent_priority_queue.h>
 
 #include "game_protocol_generated.h"
@@ -33,6 +34,9 @@ extern "C" {
 
 #pragma comment (lib, "WS2_32.LIB")
 #pragma comment (lib, "MSWSock.LIB")
+
+// Redis 클라이언트 (hiredis + redis-plus-plus)
+#include <sw/redis++/redis++.h>
 
 #define SafeDelete(x)   if (x != nullptr) { delete x; x = nullptr; }
 #define NAME_LEN 50 

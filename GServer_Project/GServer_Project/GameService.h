@@ -19,8 +19,6 @@ void lock_two_viewlists(int id1, int id2, std::function<void()> callback);
 
 // -----------------------------------------------------------------------
 // GameService
-//   FSCore Service 패턴을 적용한 인게임 행동 처리 서비스.
-//
 //   역할:
 //     - CS 패킷(로그인/이동/공격/채팅/텔레포트)을 수신하여 인게임 로직 수행
 //     - DB 가 필요한 요청(로그인)은 InnerPacket 으로 GameDBService 에 위임

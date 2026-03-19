@@ -131,10 +131,23 @@ private:
     bool Handle_LoginRequest(InnerPacket::SharedPtr pInner);
 
 private:
+    // -----------------------------------------------------------------------
+    // Redis 캐시 헬퍼
+    //   mRedis가 nullptr이면 Redis 미연결 상태 → SQL 직접 조회로 fallback
+    // -----------------------------------------------------------------------
+    bool         _CacheGet(const std::string& name, DBPlayerData& outData);
+    void         _CacheSet(const std::string& name, const DBPlayerData& data);
+    std::string  _Serialize(const DBPlayerData& data);
+    bool         _Deserialize(const std::string& str, DBPlayerData& outData);
+
+private:
     GameService* mpGameService = nullptr;
 
     bool        mShouldExit = false;
     std::thread mThread;
+
+    // Redis 연결 (연결 실패 시 nullptr → SQL fallback)
+    std::unique_ptr<sw::redis::Redis> mRedis;
 
     ObjectQueue<InnerPacket::SharedPtr>                              mWorkQueue;
     std::unordered_map<int, std::function<bool(InnerPacket::SharedPtr)>> mHandlers;
