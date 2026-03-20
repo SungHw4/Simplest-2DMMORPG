@@ -3,11 +3,10 @@
 #include "game_protocol_generated.h"
 #include "protocol.h"
 #include "InnerPacket.h"
-#include "CLIENT.h"
+#include "GameObjects.h"
 
 // 전방 선언
 class GameDBService;
-extern array<CLIENT, MAX_USER + MAX_NPC> clients;
 extern BOOL obs[WORLD_HEIGHT][WORLD_WIDTH];
 
 // ServerMain.cpp 에 정의된 유틸리티 함수 선언

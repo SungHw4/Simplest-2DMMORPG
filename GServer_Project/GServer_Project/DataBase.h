@@ -1,7 +1,7 @@
 #pragma once
 #include "stdafx.h"
 #include <sqlext.h>
-#include "CLIENT.h"
+#include "Player.h"
 #include "SStruct.h"
 
 // -----------------------------------------------------------------------
@@ -18,7 +18,7 @@ void Disconnect_DB();
 bool Load_DB(const char* name, DBPlayerData& outData);
 
 // 플레이어 업데이트/등록
-void UpdatePlayerOnDB(int c_id, CLIENT& client);
+void UpdatePlayerOnDB(int c_id, Player& client);
 bool Add_DB(char* ID, char* pwd);
 
 // SQL 인젝션 필터

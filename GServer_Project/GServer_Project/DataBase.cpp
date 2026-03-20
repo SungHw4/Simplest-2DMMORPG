@@ -152,7 +152,7 @@ bool Load_DB(const char* name, DBPlayerData& outData)
 // -----------------------------------------------------------------------
 // UpdatePlayerOnDB
 // -----------------------------------------------------------------------
-void UpdatePlayerOnDB(int /*c_id*/, CLIENT& client)
+void UpdatePlayerOnDB(int /*c_id*/, Player& client)
 {
     // SQL Injection 방지: DB에서 로드된 이름이라도 검증
     if (!DB_Injection(client.name)) return;

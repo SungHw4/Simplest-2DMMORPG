@@ -30,7 +30,7 @@ GameService::GameService()
 // -----------------------------------------------------------------------
 void GameService::_SendFB(int clientID, std::vector<uint8_t>& framed)
 {
-    clients[clientID].do_send(static_cast<int>(framed.size()), framed.data());
+    GetPlayer(clientID)->do_send(static_cast<int>(framed.size()), framed.data());
 }
 
 // -----------------------------------------------------------------------
@@ -63,7 +63,7 @@ bool GameService::_SendError(int                           clientID,
 bool GameService::Handle_Login(int clientID, const GameProtocol::CSLogin& msg)
 {
     // 이미 인게임 상태면 중복 로그인 거부
-    if (clients[clientID]._state == ST_INGAME)
+    if (GetPlayer(clientID)->_state == ST_INGAME)
         return _SendError(clientID,
                           GameProtocol::EPacketProtocol_CS_LoginRequest,
                           GameProtocol::EErrorMsg_EF_FAIL_WRONG_REQ);
@@ -102,7 +102,7 @@ bool GameService::Handle_DB_LoginResponse(InnerPacket::SharedPtr pInner)
 
     const DBPlayerData& d = pResult->data;
 
-    CLIENT& cl  = clients[clientID];
+    Player& cl  = *GetPlayer(clientID);
 
     // OP_ACCEPT에서 임시 랜덤 위치로 그리드에 등록됐으므로 DB 위치로 갱신
     int old_cx = cell_x(cl.x), old_cy = cell_y(cl.y);
@@ -138,7 +138,7 @@ bool GameService::Handle_DB_LoginResponse(InnerPacket::SharedPtr pInner)
 // -----------------------------------------------------------------------
 bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequest& msg)
 {
-    CLIENT& cl = clients[clientID];
+    Player& cl = *GetPlayer(clientID);
     GameProtocol::Direction dir = msg.direction();
 
     int old_x = cl.x;
@@ -167,7 +167,7 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
         std::unordered_set<int> cands;
         grid_get_near_players(old_cx, old_cy, cands, clientID);
         for (int id : cands)
-            if (is_player(id) && clients[id]._state == ST_INGAME && is_near(clientID, id))
+            if (is_player(id) && GetPlayer(id)->_state == ST_INGAME && is_near(clientID, id))
                 old_near.insert(id);
     }
 
@@ -182,7 +182,7 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
         std::unordered_set<int> cands;
         grid_get_near_players(new_cx, new_cy, cands, clientID);
         for (int id : cands)
-            if (is_player(id) && clients[id]._state == ST_INGAME && is_near(clientID, id))
+            if (is_player(id) && GetPlayer(id)->_state == ST_INGAME && is_near(clientID, id))
                 new_near.insert(id);
     }
 
@@ -195,7 +195,7 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
         if (old_near.count(other)) continue;
         lock_two_viewlists(clientID, other, [&]() {
             cl.viewlist.insert(other);
-            clients[other].viewlist.insert(clientID);
+            GetPlayer(other)->viewlist.insert(clientID);
         });
     }
 
@@ -204,14 +204,14 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
         if (new_near.count(other)) continue;
         lock_two_viewlists(clientID, other, [&]() {
             cl.viewlist.erase(other);
-            clients[other].viewlist.erase(clientID);
+            GetPlayer(other)->viewlist.erase(clientID);
         });
     }
 
     // 시야 내 전체 플레이어에게 이동 알림 (신규 진입 + 기존 모두)
     for (int other : new_near) {
         auto f = FBProtocol::BuildMoveResponse(dir);
-        clients[other].do_send(static_cast<int>(f.size()), f.data());
+        GetPlayer(other)->do_send(static_cast<int>(f.size()), f.data());
     }
 
     return true;
@@ -224,7 +224,7 @@ bool GameService::Handle_Move(int clientID, const GameProtocol::CSPlayerMoveRequ
 // -----------------------------------------------------------------------
 bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttackRequest& msg)
 {
-    CLIENT& cl = clients[clientID];
+    Player& cl = *GetPlayer(clientID);
     GameProtocol::Direction dir = msg.direction();
 
     cl.vl.lock();
@@ -236,20 +236,20 @@ bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttack
         if (is_attack_range(clientID, k))
         {
             // dmg를 로컬에 먼저 읽어 두 차감이 서로의 dmg를 참조하지 않도록 함
-            short dmg_to_k  = clients[clientID].dmg;
-            short dmg_to_me = clients[k].dmg;
-            clients[clientID].hp.fetch_sub(dmg_to_me);
-            clients[k].hp.fetch_sub(dmg_to_k);
+            short dmg_to_k  = cl.dmg;
+            short dmg_to_me = GetObject(k)->dmg;
+            cl.hp.fetch_sub(dmg_to_me);
+            GetObject(k)->hp.fetch_sub(dmg_to_k);
 
             auto framed = FBProtocol::BuildAttackResponse(k, dir,
-                              clients[k].hp.load(), clients[k].exp);
+                              GetObject(k)->hp.load(), GetObject(k)->exp);
             _SendFB(clientID, framed);
         }
     }
 
     // 자신의 현재 상태 전송
     auto framed = FBProtocol::BuildAttackResponse(clientID, dir,
-                      clients[clientID].hp.load(), clients[clientID].exp);
+                      cl.hp.load(), cl.exp);
     _SendFB(clientID, framed);
 
     return true;
@@ -269,7 +269,7 @@ bool GameService::Handle_Chatting(int clientID, const GameProtocol::CSPlayerChat
 
     const char* message = msg.message()->c_str();
 
-    CLIENT& cl = clients[clientID];
+    Player& cl = *GetPlayer(clientID);
     cl.vl.lock();
     std::unordered_set<int> my_vl{ cl.viewlist };
     cl.vl.unlock();
@@ -282,7 +282,7 @@ bool GameService::Handle_Chatting(int clientID, const GameProtocol::CSPlayerChat
         if (is_player(other))
         {
             auto f = FBProtocol::BuildChattingResponse(clientID, message);
-            clients[other].do_send(static_cast<int>(f.size()), f.data());
+            GetPlayer(other)->do_send(static_cast<int>(f.size()), f.data());
         }
     }
 
@@ -296,7 +296,7 @@ bool GameService::Handle_Chatting(int clientID, const GameProtocol::CSPlayerChat
 // -----------------------------------------------------------------------
 bool GameService::Handle_RandomTeleport(int clientID, const GameProtocol::CSRandomTeleportRequest& msg)
 {
-    CLIENT& cl = clients[clientID];
+    Player& cl = *GetPlayer(clientID);
 
     int old_x = cl.x;
     int old_y = cl.y;
@@ -310,9 +310,9 @@ bool GameService::Handle_RandomTeleport(int clientID, const GameProtocol::CSRand
     {
         if (!is_npc(other))
         {
-            clients[other].vl.lock();
-            clients[other].viewlist.erase(clientID);
-            clients[other].vl.unlock();
+            GetPlayer(other)->vl.lock();
+            GetPlayer(other)->viewlist.erase(clientID);
+            GetPlayer(other)->vl.unlock();
         }
     }
 
