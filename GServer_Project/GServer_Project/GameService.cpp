@@ -235,17 +235,21 @@ bool GameService::Handle_Attack(int clientID, const GameProtocol::CSPlayerAttack
     {
         if (is_attack_range(clientID, k))
         {
-            clients[clientID].hp -= clients[k].dmg;
-            clients[k].hp        -= clients[clientID].dmg;
+            // dmg를 로컬에 먼저 읽어 두 차감이 서로의 dmg를 참조하지 않도록 함
+            short dmg_to_k  = clients[clientID].dmg;
+            short dmg_to_me = clients[k].dmg;
+            clients[clientID].hp.fetch_sub(dmg_to_me);
+            clients[k].hp.fetch_sub(dmg_to_k);
 
-            auto framed = FBProtocol::BuildAttackResponse(k, dir, clients[k].hp, clients[k].exp);
+            auto framed = FBProtocol::BuildAttackResponse(k, dir,
+                              clients[k].hp.load(), clients[k].exp);
             _SendFB(clientID, framed);
         }
     }
 
     // 자신의 현재 상태 전송
     auto framed = FBProtocol::BuildAttackResponse(clientID, dir,
-                      clients[clientID].hp, clients[clientID].exp);
+                      clients[clientID].hp.load(), clients[clientID].exp);
     _SendFB(clientID, framed);
 
     return true;

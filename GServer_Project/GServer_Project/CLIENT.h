@@ -6,9 +6,9 @@ class CLIENT {
 public:
     char name[MAX_NAME_SIZE];
     int      _id;
-    short  x, y;
+    std::atomic<short>  x , y;
     short	level;
-    short	hp, maxhp;
+    std::atomic<short> hp, maxhp;
     short	exp;
     short   dmg;
     unordered_set   <int>  viewlist;

@@ -128,6 +128,7 @@ void Disconnect(int c_id)
     grid_remove_player(c_id, cl.x, cl.y);
 
     UpdatePlayerOnDB(c_id, clients[c_id]);
+    g_DBService.InvalidateCache(clients[c_id].name);  // Redis 캐시 무효화
     cl.vl.lock();
     unordered_set<int> my_vl = cl.viewlist;
     cl.vl.unlock();

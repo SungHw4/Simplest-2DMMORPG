@@ -166,7 +166,9 @@ void UpdatePlayerOnDB(int /*c_id*/, CLIENT& client)
     char tmp[128];
     sprintf_s(tmp, sizeof(tmp),
               "EXEC UpdatePlayer '%s', %d, %d, %d, %d, %d",
-              client.name, client.level, client.x, client.y, client.hp, client.exp);
+              client.name, (int)client.level,
+              (int)client.x.load(), (int)client.y.load(),
+              (int)client.hp.load(), (int)client.exp);
 
     wchar_t* exec = nullptr;
     int strSize = MultiByteToWideChar(CP_ACP, 0, tmp, -1, NULL, NULL);

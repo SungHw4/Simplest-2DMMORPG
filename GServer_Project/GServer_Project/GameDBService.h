@@ -58,6 +58,14 @@ public:
 
     void SetGameService(GameService* pGameService) { mpGameService = pGameService; }
 
+    // 로그아웃 시 Redis 캐시 무효화 (Disconnect에서 호출)
+    void InvalidateCache(const std::string& name)
+    {
+        if (!mRedis) return;
+        try { mRedis->del("player:" + name); }
+        catch (...) {}
+    }
+
     // InnerPacket 작업 요청 Push
     void Push(InnerPacket::SharedPtr pInner)
     {
