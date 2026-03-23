@@ -687,15 +687,26 @@ int main()
     WSAStartup(MAKEWORD(2, 2), &WSAData);
     g_s_socket = WSASocket(
         AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
+    if (g_s_socket == INVALID_SOCKET) {
+        cout << "[ERROR] WSASocket failed: " << WSAGetLastError() << endl;
+        return -1;
+    }
 
     SOCKADDR_IN server_addr;
     ZeroMemory(&server_addr, sizeof(server_addr));
     server_addr.sin_family      = AF_INET;
     server_addr.sin_port        = htons(SERVER_PORT);
     server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    bind(g_s_socket,
-         reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr));
-    listen(g_s_socket, SOMAXCONN);
+    if (::bind(g_s_socket,
+               reinterpret_cast<sockaddr*>(&server_addr), sizeof(server_addr)) != 0) {
+        cout << "[ERROR] bind failed: " << WSAGetLastError() << endl;
+        return -1;
+    }
+    if (listen(g_s_socket, SOMAXCONN) != 0) {
+        cout << "[ERROR] listen failed: " << WSAGetLastError() << endl;
+        return -1;
+    }
+    cout << "[OK] Listening on 0.0.0.0:" << SERVER_PORT << endl;
 
     g_h_iocp = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, NULL, 0);
     CreateIoCompletionPort(

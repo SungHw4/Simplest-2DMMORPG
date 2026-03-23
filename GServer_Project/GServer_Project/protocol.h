@@ -52,18 +52,26 @@ namespace FBProtocol {
 using Builder = flatbuffers::FlatBufferBuilder;
 
 // -----------------------------------------------------------------------
-// Helper: 직렬화된 FlatBuffers 버퍼 앞에 4바이트 messegeid 헤더를 붙여 반환
+// Helper: 직렬화된 FlatBuffers 버퍼 앞에 8바이트 헤더를 붙여 반환
+//   포맷: [4바이트 messegeid (LE)][4바이트 fb_size (LE)][fb_data]
+//   서버 OP_RECV 수신 포맷과 동일하게 맞춤 (CS/SC 공통)
 // -----------------------------------------------------------------------
 inline std::vector<uint8_t> Frame(int32_t messege_id,
                                    const uint8_t* fb_buf,
                                    uint32_t fb_size)
 {
-    std::vector<uint8_t> framed(4 + fb_size);
+    std::vector<uint8_t> framed(8 + fb_size);
+    // messegeid (4 bytes LE)
     framed[0] = static_cast<uint8_t>(messege_id & 0xFF);
     framed[1] = static_cast<uint8_t>((messege_id >> 8)  & 0xFF);
     framed[2] = static_cast<uint8_t>((messege_id >> 16) & 0xFF);
     framed[3] = static_cast<uint8_t>((messege_id >> 24) & 0xFF);
-    std::memcpy(framed.data() + 4, fb_buf, fb_size);
+    // fb_size (4 bytes LE)
+    framed[4] = static_cast<uint8_t>(fb_size & 0xFF);
+    framed[5] = static_cast<uint8_t>((fb_size >> 8)  & 0xFF);
+    framed[6] = static_cast<uint8_t>((fb_size >> 16) & 0xFF);
+    framed[7] = static_cast<uint8_t>((fb_size >> 24) & 0xFF);
+    std::memcpy(framed.data() + 8, fb_buf, fb_size);
     return framed;
 }
 
