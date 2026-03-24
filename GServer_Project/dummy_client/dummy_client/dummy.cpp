@@ -107,13 +107,21 @@ void error_display(const char* msg, int err_no)
 
 // -----------------------------------------------------------------------
 // DisconnectClient
+//   connected==true  → active_clients 감소 + 소켓 닫기
+//   connected==false → 소켓만 닫기 (로그인 완료 전 에러 수신 시 좀비 소켓 방지)
 // -----------------------------------------------------------------------
 void DisconnectClient(int ci)
 {
     bool expected = true;
-    if (atomic_compare_exchange_strong(&g_clients[ci].connected, &expected, false)) {
-        closesocket(g_clients[ci].client_socket);
+    bool was_connected = atomic_compare_exchange_strong(
+        &g_clients[ci].connected, &expected, false);
+    if (was_connected)
         active_clients--;
+
+    SOCKET s = g_clients[ci].client_socket;
+    if (s != INVALID_SOCKET) {
+        g_clients[ci].client_socket = INVALID_SOCKET;
+        closesocket(s);
     }
 }
 
@@ -204,6 +212,11 @@ void SendMove(int ci, GameProtocol::Direction dir)
 //   서버 → 클라이언트 포맷: [4 msgId][4 fb_size][fb_data]
 //   fb_data / fb_size는 헤더를 제거한 뒤 전달됨
 // -----------------------------------------------------------------------
+// 진단용: 수신 패킷 종류별 카운터 (draw.cpp에서 extern으로 참조)
+std::atomic_int g_recv_104{ 0 };
+std::atomic_int g_recv_500{ 0 };
+std::atomic_int g_recv_unknown{ 0 };
+
 void DispatchSCPacket(int ci, int32_t msgId,
                       const uint8_t* fb_data, uint32_t fb_size)
 {
@@ -212,9 +225,13 @@ void DispatchSCPacket(int ci, int32_t msgId,
     case SC_LOGIN_RESPONSE:  // 104: 서버는 SCPlayerMoveResponse 구조체 재사용
     {
         flatbuffers::Verifier v(fb_data, fb_size);
-        if (!v.VerifyBuffer<GameProtocol::SCPlayerMoveResponse>()) break;
+        if (!v.VerifyBuffer<GameProtocol::SCPlayerMoveResponse>()) {
+            printf("[WARN] ci=%d 104 Verifier FAIL (fb_size=%u)\n", ci, fb_size);
+            break;
+        }
         g_clients[ci].connected = true;
         active_clients++;
+        g_recv_104++;
         break;
     }
 
@@ -236,10 +253,17 @@ void DispatchSCPacket(int ci, int32_t msgId,
         break;
 
     case SC_INTEGRATION_ERROR_NOTIFICATION:  // 500: 로그인 실패 등
+        g_recv_500++;
+        if (g_recv_500 <= 5)  // 처음 5번만 상세 출력
+            printf("[ERROR] ci=%d SC_ERROR_500 received (total=%d)\n",
+                   ci, g_recv_500.load());
         DisconnectClient(ci);
         break;
 
     default:
+        g_recv_unknown++;
+        if (g_recv_unknown <= 5)
+            printf("[WARN] ci=%d unknown msgId=%d\n", ci, msgId);
         break;
     }
 }

@@ -22,6 +22,10 @@
 
 #include "dummy.h"
 
+// 진단용 카운터 (dummy.cpp에서 정의)
+extern std::atomic_int g_recv_104;
+extern std::atomic_int g_recv_500;
+
 HDC			hDC = NULL;		// Private GDI Device Context
 HGLRC		hRC = NULL;		// Permanent Rendering Context
 HWND		hWnd = NULL;		// Holds Our Window Handle
@@ -135,11 +139,14 @@ int DrawGLScene(GLvoid)									// Here's Where We Do All The Drawing
 	glTranslatef(0.14f, -0.4f, -1.0f);						// Move One Unit Into The Screen
 															// Pulsing Colors Based On Text Position
 	glColor3f(1, 1, 0);
-	// Position The Text On The Screen
 	glRasterPos2f(0.0f, 0.00f);
-	glPrint("STRESS TEST [%d]", (int)active_clients);	// Print GL Text To The Screen
+	glPrint("STRESS TEST [%d]", (int)active_clients);
 	glRasterPos2f(0.0f, 0.05f);
 	glPrint("Delay : %dms", global_delay.load());
+	// 진단 정보: 104(로그인 성공) vs 500(에러) 수신 카운트
+	glColor3f(0, 1, 0);
+	glRasterPos2f(0.0f, 0.10f);
+	glPrint("Login OK(104):%d  Error(500):%d", g_recv_104.load(), g_recv_500.load());
 
 	glColor3f(1, 1, 1);
 
