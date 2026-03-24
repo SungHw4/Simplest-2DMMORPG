@@ -75,7 +75,8 @@ struct CLIENT {
     unsigned char   accum_buf[ACCUM_BUF_SIZE]; // 수신 누적 버퍼
     int             accum_size;                // 누적된 바이트 수
 
-    int64_t         send_time_ms;  // 마지막 이동 패킷 전송 시각
+    int64_t         send_time_ms;       // 마지막 이동 패킷 전송 시각
+    bool            awaiting_response;  // 내가 보낸 이동의 응답을 기다리는 중
     high_resolution_clock::time_point last_move_time;
 };
 
@@ -198,8 +199,9 @@ void SendMove(int ci, GameProtocol::Direction dir)
     case GameProtocol::Direction_RIGHT: if (g_clients[ci].x < WORLD_WIDTH-1)  g_clients[ci].x++; break;
     }
 
-    g_clients[ci].send_time_ms = duration_cast<milliseconds>(
+    g_clients[ci].send_time_ms      = duration_cast<milliseconds>(
         high_resolution_clock::now().time_since_epoch()).count();
+    g_clients[ci].awaiting_response = true;
 
     flatbuffers::FlatBufferBuilder fbb;
     auto move = GameProtocol::CreateCSPlayerMoveRequest(fbb, dir);
@@ -237,13 +239,18 @@ void DispatchSCPacket(int ci, int32_t msgId,
 
     case SC_PLAYER_MOVE_RESPONSE:  // 202
     {
-        int64_t now_ms = duration_cast<milliseconds>(
-            high_resolution_clock::now().time_since_epoch()).count();
-        int64_t d_ms = now_ms - g_clients[ci].send_time_ms;
-        if (d_ms > 0 && d_ms < 10000) {
-            int cur = global_delay.load();
-            if (cur < (int)d_ms) global_delay++;
-            else if (cur > (int)d_ms) global_delay--;
+        // awaiting_response가 true일 때만 측정 — 내가 보낸 이동의 응답만 RTT로 계산
+        // 다른 플레이어 이동으로 인한 브로드캐스트 패킷은 무시
+        if (g_clients[ci].awaiting_response) {
+            g_clients[ci].awaiting_response = false;
+            int64_t now_ms = duration_cast<milliseconds>(
+                high_resolution_clock::now().time_since_epoch()).count();
+            int64_t d_ms = now_ms - g_clients[ci].send_time_ms;
+            if (d_ms > 0 && d_ms < 10000) {
+                int cur = global_delay.load();
+                if (cur < (int)d_ms) global_delay++;
+                else if (cur > (int)d_ms) global_delay--;
+            }
         }
         break;
     }
@@ -394,10 +401,13 @@ void Adjust_Number_Of_Client()
         return;
     }
 
-    if (max_limit - (max_limit / 20) < active_clients) return;
-
+    // 지연이 정상 범위로 회복됐을 때 max_limit을 서서히 증가시켜 데드락 방지
     increasing = true;
     delay_multiplier = 1;
+    if (max_limit < MAX_TEST)
+        max_limit = min(MAX_TEST, max_limit + max(1, max_limit / 10));
+
+    if (max_limit - (max_limit / 20) < active_clients) return;
     last_connect_time = high_resolution_clock::now();
 
     int idx = num_connections;
@@ -428,7 +438,8 @@ void Adjust_Number_Of_Client()
     cl.y             = rand() % WORLD_HEIGHT;
     cl.accum_size    = 0;
     cl.connected     = false;
-    cl.send_time_ms  = 0;
+    cl.send_time_ms      = 0;
+    cl.awaiting_response = false;
 
     ZeroMemory(&cl.recv_over, sizeof(cl.recv_over));
     cl.recv_over.event_type    = OP_RECV;

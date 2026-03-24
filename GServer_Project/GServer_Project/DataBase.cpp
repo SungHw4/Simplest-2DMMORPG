@@ -54,7 +54,7 @@ void Initialize_DB()
 
     SQLSetConnectAttr(hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER)5, 0);
 
-    retcode = SQLConnect(hdbc, (SQLWCHAR*)L"2021_GServer_ODBC", SQL_NTS,
+    retcode = SQLConnect(hdbc, (SQLWCHAR*)L"GameDB", SQL_NTS,
                          (SQLWCHAR*)NULL, 0, NULL, 0);
     if (retcode == SQL_SUCCESS || retcode == SQL_SUCCESS_WITH_INFO)
         cout << "DB connect SUCCESS" << endl;
