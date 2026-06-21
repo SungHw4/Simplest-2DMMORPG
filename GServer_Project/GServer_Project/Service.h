@@ -54,7 +54,7 @@ template<> struct PacketProtocolID<GameProtocol::SCIntegrationErrorNotification>
     { static constexpr int value = 500; };
 
 // -----------------------------------------------------------------------
-// Service (FSCore의 Service 패턴 적용)
+// Service
 //
 // 역할:
 //   - 네트워크 수신 패킷(Packet)을 내부 큐에 쌓고 전용 스레드에서 디스패치

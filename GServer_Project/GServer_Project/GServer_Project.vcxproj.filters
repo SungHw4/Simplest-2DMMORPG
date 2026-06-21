@@ -24,9 +24,6 @@
     <ClCompile Include="DataBase.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
-    <ClCompile Include="CLIENT.cpp">
-      <Filter>소스 파일</Filter>
-    </ClCompile>
     <ClCompile Include="GameDBService.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
@@ -45,15 +42,15 @@
     <ClCompile Include="ExpOverPool.cpp">
       <Filter>소스 파일</Filter>
     </ClCompile>
+    <ClCompile Include="Player.cpp">
+      <Filter>소스 파일</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DataBase.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="stdafx.h">
-      <Filter>헤더 파일</Filter>
-    </ClInclude>
-    <ClInclude Include="CLIENT.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="enum.h">
@@ -99,6 +96,21 @@
       <Filter>헤더 파일</Filter>
     </ClInclude>
     <ClInclude Include="ExpOverPool.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="BaseObject.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="Player.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="NPC.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="GameObjects.h">
+      <Filter>헤더 파일</Filter>
+    </ClInclude>
+    <ClInclude Include="ExpOverPool_TaggedPointer.h">
       <Filter>헤더 파일</Filter>
     </ClInclude>
   </ItemGroup>

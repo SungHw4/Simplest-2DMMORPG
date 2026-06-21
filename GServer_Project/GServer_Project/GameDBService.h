@@ -38,8 +38,6 @@ struct LoginResultData : public IInnerData
 
 // -----------------------------------------------------------------------
 // GameDBService
-//   FSCore DatabaseService 패턴을 적용한 DB 전용 처리 서비스.
-//
 //   역할:
 //     - InnerPacket 으로 DB 작업 요청을 수신
 //     - DB 쿼리 수행 후 결과를 InnerPacket 으로 GameService 에 전달
@@ -116,7 +114,7 @@ private:
 
     // -----------------------------------------------------------------------
     // RegisterHandler<Derived>(EInnerProtocol, 멤버함수포인터)
-    //   DB 작업 핸들러 등록 (FSCore DatabaseService 패턴 동일)
+    //   DB 작업 핸들러 등록
     // -----------------------------------------------------------------------
     template <typename DerivedType,
         typename = typename std::enable_if<std::is_base_of<GameDBService, DerivedType>::value>::type>

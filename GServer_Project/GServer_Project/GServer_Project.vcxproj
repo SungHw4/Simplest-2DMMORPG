@@ -166,6 +166,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="BaseObject.h" />
+    <ClInclude Include="ExpOverPool_TaggedPointer.h" />
     <ClInclude Include="Player.h" />
     <ClInclude Include="NPC.h" />
     <ClInclude Include="GameObjects.h" />
