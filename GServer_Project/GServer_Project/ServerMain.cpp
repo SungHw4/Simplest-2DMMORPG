@@ -214,6 +214,33 @@ void RegisterAllHandlers()
     g_packet_handler.RegisterHandler(CS_RANDOM_TELEPORT_REQUEST, handle_random_teleport);
 }
 
+//Accept실패시 에러 확인용
+bool post_accept(EXP_OVER* accept_over)
+{
+    ZeroMemory(&accept_over->_wsa_over, sizeof(accept_over->_wsa_over));
+
+    SOCKET c_socket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP,
+                                0, 0, WSA_FLAG_OVERLAPPED);
+    if (c_socket == INVALID_SOCKET) {
+        cout << "[ACCEPT] WSASocket FAILED: " << WSAGetLastError() << endl;
+        return false;
+    }
+    *(reinterpret_cast<SOCKET*>(accept_over->_net_buf)) = c_socket;
+
+    BOOL ok = AcceptEx(g_s_socket, c_socket, accept_over->_net_buf + 8, 0,
+                       sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
+                       NULL, &accept_over->_wsa_over);
+    if (ok == FALSE) {
+        int e = WSAGetLastError();
+        if (e != ERROR_IO_PENDING) {        // 에러
+            cout << "[ACCEPT] AcceptEx FAILED: " << e << endl;
+            closesocket(c_socket);
+            return false;
+        }
+    }
+    return true;  
+}
+
 // -----------------------------------------------------------------------
 // Worker thread
 // -----------------------------------------------------------------------
@@ -231,7 +258,17 @@ void worker()
 
         if (FALSE == ret) {
             int err_no = WSAGetLastError();
-            cout << "GQCS Error : ";
+
+            if (exp_over != nullptr && exp_over->_comp_op == OP_ACCEPT) {
+                
+                cout << "[ACCEPT] GQCS err=" << err_no << endl;
+                closesocket(*(reinterpret_cast<SOCKET*>(exp_over->_net_buf)));  
+                if (!post_accept(exp_over))
+                    cout << "[ACCEPT] FAILED" << endl;
+                continue;
+            }
+
+            cout << "GQCS Error : "; 
             error_display(err_no);
             cout << endl;
             Disconnect(client_id);
@@ -306,14 +343,9 @@ void worker()
                     reinterpret_cast<HANDLE>(c_socket), g_h_iocp, new_id, 0);
                 cl.do_recv();
             }
-
-            ZeroMemory(&exp_over->_wsa_over, sizeof(exp_over->_wsa_over));
-            c_socket = WSASocket(
-                AF_INET, SOCK_STREAM, IPPROTO_TCP, 0, 0, WSA_FLAG_OVERLAPPED);
-            *(reinterpret_cast<SOCKET*>(exp_over->_net_buf)) = c_socket;
-            AcceptEx(g_s_socket, c_socket, exp_over->_net_buf + 8, 0,
-                sizeof(SOCKADDR_IN) + 16, sizeof(SOCKADDR_IN) + 16,
-                NULL, &exp_over->_wsa_over);
+            
+            if (!post_accept(exp_over))
+                cout << "[ACCEPT] FAILED " << endl;
             break;
         }
         case OP_NPC_MOVE: {
@@ -486,6 +518,13 @@ void npcmove(int npc_id)
     int old_cx = cell_x(npc->x);
     int old_cy = cell_y(npc->y);
 
+    // 근처 Grid에 플레이어가 없으면 이동 생략 (Worker Thread 부하 절감)
+    {
+        unordered_set<int> cands;
+        grid_get_near_players(old_cx, old_cy, cands);
+        if (cands.empty()) return;
+    }
+
     unordered_set<int> old_near;
     {
         unordered_set<int> cands;
@@ -636,8 +675,11 @@ void do_timer()
 
         while (true) {
             timer_event ev;
-            if (timer_queue.size() == 0) break;
-            timer_queue.try_pop(ev);
+            if (!timer_queue.try_pop(ev)) {
+                this_thread::sleep_for(1ms);
+                dura = 0ms;
+                break;
+            }
 
             dura = ev.start_time - chrono::system_clock::now();
             if (dura <= 0ms) {

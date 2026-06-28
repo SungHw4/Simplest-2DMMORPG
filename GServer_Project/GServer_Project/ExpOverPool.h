@@ -109,5 +109,13 @@ public:
     }
 };
 
-// 전역 싱글턴 선언 — 정의는 ExpOverPool.cpp
-extern ExpOverPool g_ExpOverPool;
+#define USE_TAGGED_POOL
+
+#ifdef USE_TAGGED_POOL
+  #include "ExpOverPool_TaggedPointer.h"
+  using ExpOverPoolType = ExpOverPoolTagged;
+#else
+  using ExpOverPoolType = ExpOverPool;
+#endif
+
+extern ExpOverPoolType g_ExpOverPool;
