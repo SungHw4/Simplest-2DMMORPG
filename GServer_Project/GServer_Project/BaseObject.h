@@ -25,7 +25,7 @@ public:
     std::unordered_set<int> viewlist;
     std::mutex              vl;
     std::mutex              state_lock;
-    STATE                   _state  = ST_FREE;
+    std::atomic<STATE>      _state{ ST_FREE };
     std::atomic_bool        _is_active{false};
 
     BaseObject() = default;
@@ -35,7 +35,7 @@ public:
     BaseObject(const BaseObject&)            = delete;
     BaseObject& operator=(const BaseObject&) = delete;
 
-    STATE get_state()          { return _state; }
+    STATE get_state() const    { return _state.load(std::memory_order_acquire); }
     void  set_active(bool act) { _is_active = act; }
     int   get_id()             { return _id; }
 };
