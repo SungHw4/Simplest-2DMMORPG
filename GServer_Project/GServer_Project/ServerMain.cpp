@@ -124,18 +124,33 @@ void Disconnect(int c_id)
 
     Player& cl = *GetPlayer(c_id);
 
+    STATE prev;
+    
+    for (;;) {
+        prev = cl._state.load(std::memory_order_acquire);
+        if (prev == ST_FREE || prev == ST_DISCONNECTING)
+            return;
+        if (cl._state.compare_exchange_weak(prev, ST_DISCONNECTING))
+            break;
+    }
+    
     grid_remove_player(c_id, cl.x, cl.y);
-    UpdatePlayerOnDB(c_id, cl);
-    g_DBService.InvalidateCache(cl.name);
 
+    if (prev == ST_INGAME) {
+        UpdatePlayerOnDB(c_id, cl);
+        g_DBService.InvalidateCache(cl.name);
+    }
+
+    
     cl.vl.lock();
     unordered_set<int> my_vl = cl.viewlist;
+    cl.viewlist.clear();
     cl.vl.unlock();
 
     for (auto& other_id : my_vl) {
         BaseObject* target = GetObject(other_id);
         if (is_npc(target->_id)) continue;
-        if (ST_INGAME != target->_state) continue;
+        if (ST_INGAME != target->get_state()) continue;
         target->vl.lock();
         if (0 != target->viewlist.count(c_id)) {
             target->viewlist.erase(c_id);
@@ -145,7 +160,8 @@ void Disconnect(int c_id)
 
     cl.state_lock.lock();
     closesocket(cl._socket);
-    cl._state = ST_FREE;
+    cl._socket = INVALID_SOCKET;
+    cl._state  = ST_FREE;          
     cl.state_lock.unlock();
 }
 
